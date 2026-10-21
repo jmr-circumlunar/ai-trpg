@@ -15,8 +15,11 @@ class WorldRef(BaseModel):
 
 
 class Clock(BaseModel):
+    """游戏内时间。只能通过 `clock.advance`（分钟数）前进，不允许倒退。"""
+
     day: int = Field(default=1, ge=1)
     hour: int = Field(default=20, ge=0, le=23)
+    minute: int = Field(default=0, ge=0, le=59)
     weather: str = "clear"
 
 

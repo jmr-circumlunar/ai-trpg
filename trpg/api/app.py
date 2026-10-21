@@ -80,6 +80,7 @@ class CreateSessionReq(BaseModel):
     seed: str = "42"
     provider: str = "mock"
     model: str | None = None
+    reasoning_effort: str | None = None
 
 
 def _get(sid: str) -> Session:
@@ -134,7 +135,9 @@ def create_session(req: CreateSessionReq) -> dict:
 
     cards = build_cards(req.players)
     state = build_state(pack, cards, req.era)
-    llm = build_llm(ROOT, rules, pack, cards, req.provider, req.model, req.seed)
+    llm = build_llm(
+        ROOT, rules, pack, cards, req.provider, req.model, req.seed, req.reasoning_effort
+    )
     loop = GameLoop(rules, cards, state, llm, seed=req.seed)
 
     session = Session(sid=state.session_id, pack=pack, cards=cards, loop=loop)

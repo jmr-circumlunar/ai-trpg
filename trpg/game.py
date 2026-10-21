@@ -66,6 +66,7 @@ def build_llm(
     provider: str = "mock",
     model: str | None = None,
     seed: str | int = 42,
+    reasoning_effort: str | None = None,
 ):
     if provider == "mock":
         return MockLLM(seed)
@@ -80,4 +81,6 @@ def build_llm(
         world_name=pack.name,
         provider=None if provider == "auto" else provider,
         model=model,
+        reasoning_effort=reasoning_effort,
+        rules=rules,
     )

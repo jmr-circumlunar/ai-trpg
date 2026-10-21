@@ -22,7 +22,9 @@ class QueueAdapter:
         self.payloads = list(payloads)
         self.calls: list[list[dict]] = []
 
-    def chat(self, messages, model, temperature=0.9, max_tokens=1200) -> ChatResult:
+    def chat(
+        self, messages, model, temperature=0.9, max_tokens=1200, extra_override=None
+    ) -> ChatResult:
         self.calls.append(messages)
         payload = self.payloads.pop(0) if self.payloads else {}
         return ChatResult(

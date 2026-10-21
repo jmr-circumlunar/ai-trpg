@@ -5,6 +5,8 @@ defaults:
   provider: minimax
   model: MiniMax-M3.1-Flash
   temperature: 0.9
+  # 思考深度：low / medium / high（仅推理模型有效，空 = 不限）
+  reasoning_effort: low
 
 providers:
   minimax:

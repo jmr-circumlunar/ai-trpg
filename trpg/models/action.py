@@ -29,6 +29,7 @@ class JudgeResult(BaseModel):
     actor_id: str
     skill: str | None
     action_type: str
+    phase: str = ""
     attr: str
     attr_mod: int
     skill_bonus: int

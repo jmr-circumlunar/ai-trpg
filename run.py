@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -27,6 +28,7 @@ if hasattr(sys.stdout, "reconfigure"):
 from trpg.engine.loop import GameLoop  # noqa: E402
 from trpg.game import build_cards, build_llm, build_state  # noqa: E402
 from trpg.rules.loader import Rules  # noqa: E402
+from trpg.storage import db  # noqa: E402
 from trpg.world import discover_worlds, load_world  # noqa: E402
 
 
@@ -56,14 +58,31 @@ def cmd_run(args: argparse.Namespace) -> int:
     state = build_state(pack, cards, args.era)
     turns = args.turns if args.turns is not None else (3 if args.provider != "mock" else 20)
 
-    llm = build_llm(ROOT, rules, pack, cards, args.provider, args.model, args.seed)
+    conn = None
+    if not args.no_db:
+        conn = db.connect(args.db)
+        db.init_db(conn)
+        db.save_session(
+            conn,
+            state.session_id,
+            args.seed,
+            state.world.world_id,
+            state.world.era,
+            datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            name=f"{args.provider} 局",
+        )
+        db.save_state(conn, state)
+
+    llm = build_llm(
+        ROOT, rules, pack, cards, args.provider, args.model, args.seed, args.reasoning_effort
+    )
     print(
         f"world={pack.world_id}({pack.name}) era={state.world.era} region={state.scene.region}"
         f" | provider={args.provider} model={getattr(llm, 'model', 'mock')}"
         f" turns={turns} players={args.players}\n"
     )
 
-    loop = GameLoop(rules, cards, state, llm, seed=args.seed)
+    loop = GameLoop(rules, cards, state, llm, seed=args.seed, conn=conn)
     records = asyncio.run(loop.run(turns))
 
     counter: Counter[str] = Counter()
@@ -82,6 +101,11 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"回合数      {len(records)}")
     print(f"最终版本    v{loop.state.version}")
     print(f"幕次 / 张力 stage={loop.state.stage} tension={loop.state.tension}")
+    _c = loop.state.clock
+    print(
+        f"游戏时间    第 {_c.day} 天 {_c.hour:02d}:{_c.minute:02d}"
+        f"（{rules.phase_label(rules.phase_of(_c.hour))}）"
+    )
     print(f"HP          {hp_line}")
     print(f"判定分布    {dict(counter)}")
     print(f"骰子状态    {loop.dice.rng_state}")
@@ -102,6 +126,11 @@ def cmd_run(args: argparse.Namespace) -> int:
         if usage["fail"]:
             print(f"最近错误    {getattr(llm, '_last_error', '')}")
 
+    if conn is not None:
+        print(f"落库        {Path(args.db).resolve()}")
+        db.save_state(conn, loop.state)
+        conn.close()
+
     return 0
 
 
@@ -121,7 +150,14 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--world", default="ironvale", help="worlds/<id>/ 里的世界包")
     run.add_argument("--era", default=None, help="覆盖世界包默认 era")
     run.add_argument("--model", default=None, help="覆盖默认模型名")
+    run.add_argument(
+        "--reasoning-effort",
+        default=None,
+        help="思考深度 low|medium|high（仅推理模型有效，覆盖全局默认）",
+    )
     run.add_argument("--quiet", action="store_true", help="只打印判定，不打印叙事")
+    run.add_argument("--db", default="run.db")
+    run.add_argument("--no-db", action="store_true")
     run.set_defaults(func=cmd_run)
 
     worlds = sub.add_parser("worlds", help="列出可用世界包")

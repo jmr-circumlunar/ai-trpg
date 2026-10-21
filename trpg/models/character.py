@@ -15,6 +15,8 @@ class ModelConfig(BaseModel):
     model: str = ""
     temperature: float | None = None
     max_tokens: int = 0
+    # 思考深度："" 跟随全局；low / medium / high（仅推理模型有效）
+    reasoning_effort: str = ""
 
 
 class AIExtended(BaseModel):

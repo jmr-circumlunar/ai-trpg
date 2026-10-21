@@ -40,6 +40,8 @@ class AgentLLM:
         world_name: str = "铁谷",
         provider: str | None = None,
         model: str | None = None,
+        reasoning_effort: str | None = None,
+        rules=None,
     ) -> None:
         self.config = config
         self.cards = cards
@@ -47,10 +49,14 @@ class AgentLLM:
         self.taboos = taboos or DEFAULT_TABOOS
         self.style = style
         self.world_name = world_name
-        self.default_spec: ModelSpec = config.resolve(provider=provider, model=model)
+        self.rules = rules
+        self.default_spec: ModelSpec = config.resolve(
+            provider=provider, model=model, reasoning_effort=reasoning_effort
+        )
         # CLI 覆盖：临时实验开关，优先级高于角色卡
         self._override_provider = provider
         self._override_model = model
+        self._override_effort = reasoning_effort
 
         self.usage: dict[str, Any] = {
             "calls": 0,
@@ -83,9 +89,17 @@ class AgentLLM:
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ]
+        # 思考深度按 spec 覆盖（角色卡或全局），空则不传
+        override = (
+            {"reasoning_effort": spec.reasoning_effort}
+            if spec.reasoning_effort
+            else None
+        )
 
         try:
-            result = adapter.chat(messages, spec.model, spec.temperature, max_tokens)
+            result = adapter.chat(
+                messages, spec.model, spec.temperature, max_tokens, override
+            )
             self._count(result)
             return extract_json(result.content)
         except Exception as exc:
@@ -98,6 +112,7 @@ class AgentLLM:
                 spec.model,
                 spec.temperature,
                 max_tokens,
+                override,
             )
             self._count(result)
             return extract_json(result.content)
@@ -107,12 +122,23 @@ class AgentLLM:
             self.world_name, state.world.era, self.style, self.taboos
         )
 
+    def _phase_label(self, state: GameState) -> str:
+        if self.rules is None:
+            return ""
+        try:
+            return self.rules.phase_label(self.rules.phase_of(state.clock.hour))
+        except Exception:  # noqa: BLE001
+            return ""
+
+    def _step_options(self) -> list[dict]:
+        return list(getattr(self.rules, "allowed_steps", []) or [])
+
     # ── GM ──────────────────────────────────────────────────
     def describe_scene(self, state: GameState, turn: int) -> dict:
         try:
             data = self._chat_json(
                 self._gm_system(state),
-                prompts.gm_scene_user(state, self.cards, turn),
+                prompts.gm_scene_user(state, self.cards, turn, self._phase_label(state)),
                 self.default_spec,
                 "scene",
             )
@@ -159,7 +185,14 @@ class AgentLLM:
         try:
             data = self._chat_json(
                 self._gm_system(state),
-                prompts.gm_narrate_batch_user(state, self.cards, items, turn),
+                prompts.gm_narrate_batch_user(
+                    state,
+                    self.cards,
+                    items,
+                    turn,
+                    self._phase_label(state),
+                    self._step_options(),
+                ),
                 self.default_spec,
                 "narrate",
             )
@@ -211,6 +244,7 @@ class AgentLLM:
             card_model=card.ext.model,
             provider=self._override_provider,
             model=self._override_model,
+            reasoning_effort=self._override_effort,
         )
         try:
             data = self._chat_json(

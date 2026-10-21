@@ -22,6 +22,7 @@ class ModelSpec:
     model: str
     temperature: float = 0.9
     max_tokens: int = 0  # 0 = 用调用处的任务默认值
+    reasoning_effort: str = ""  # "" = 不覆盖，用 provider 默认
 
 
 class LLMConfig:
@@ -80,6 +81,7 @@ class LLMConfig:
         provider: str | None = None,
         model: str | None = None,
         temperature: float | None = None,
+        reasoning_effort: str | None = None,
     ) -> ModelSpec:
         provider = provider or (card_model.provider if card_model and card_model.provider else "")
         provider = provider or self.defaults.get("provider", "minimax")
@@ -93,8 +95,21 @@ class LLMConfig:
         if temp is None:
             temp = float(self.defaults.get("temperature", 0.9))
 
+        # 思考深度：CLI > 角色卡 > 全局默认 > provider 自带
+        effort = reasoning_effort or ""
+        if not effort and card_model is not None:
+            effort = card_model.reasoning_effort or ""
+        if not effort:
+            effort = str(self.defaults.get("reasoning_effort", "") or "")
+
         max_tokens = card_model.max_tokens if card_model else 0
-        return ModelSpec(provider=provider, model=model, temperature=temp, max_tokens=max_tokens)
+        return ModelSpec(
+            provider=provider,
+            model=model,
+            temperature=temp,
+            max_tokens=max_tokens,
+            reasoning_effort=effort,
+        )
 
     def describe(self) -> str:
         return f"{self.defaults.get('provider')}/{self.defaults.get('model')}"

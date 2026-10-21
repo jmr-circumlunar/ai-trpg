@@ -11,6 +11,7 @@ from typing import Any
 
 from ..models import CharacterCard, GameState, StateDelta
 from ..models.enums import DeltaOp
+from ..rules import clock as clock_mod
 
 _MAX_TENSION_DELTA = 20
 _MAX_HP_RATIO = 0.6
@@ -18,7 +19,8 @@ _MAX_HP_RATIO = 0.6
 _ALLOWED_PATTERNS = [
     re.compile(r"^characters\.[A-Za-z0-9_]+\.(hp|sanity|conditions|inventory|position)$"),
     re.compile(r"^party\.(gold|supplies|flags|reputation)$"),
-    re.compile(r"^clock\.(day|hour|weather)$"),
+    # 时间只能通过 clock.advance（分钟数）前进，day/hour/minute 不允许直接 set
+    re.compile(r"^clock\.(advance|weather)$"),
     re.compile(r"^tension$"),
     re.compile(r"^stage$"),
     re.compile(r"^scene\.(location_id|present_npcs|exits|description)$"),
@@ -63,9 +65,14 @@ def apply_delta(
     state: GameState,
     delta: StateDelta,
     cards: dict[str, CharacterCard] | None = None,
+    clock_cfg: dict | None = None,
 ) -> GameState:
     """应用增量并校验，返回新 state（version+1）。失败抛 DeltaValidationError。"""
     cards = cards or {}
+    clock_cfg = clock_cfg or {}
+    step_min = int(clock_cfg.get("min_step_minutes", 5))
+    step_max = int(clock_cfg.get("max_step_minutes", 480))
+    clock_total = 0
     errors: list[str] = []
 
     # 1) 路径白名单
@@ -83,6 +90,29 @@ def apply_delta(
 
     # 2) 逐条应用
     for ch in delta.changes:
+        # 时间推进是虚拟路径，需要特殊处理（跨天进位 + 档位校验）
+        if ch.path == "clock.advance":
+            try:
+                minutes = int(ch.value or 0)
+            except (TypeError, ValueError):
+                errors.append("clock.advance 必须是整数分钟")
+                continue
+            if minutes < step_min:
+                errors.append(f"clock.advance 小于最小档 {step_min} 分钟（收到 {minutes}）")
+                continue
+            if minutes > step_max:
+                errors.append(f"clock.advance 超过单回合上限 {step_max} 分钟（收到 {minutes}）")
+                continue
+            clock_total += minutes
+            if clock_total > step_max:
+                errors.append(f"单回合累计推进超过 {step_max} 分钟")
+                continue
+            d, h, m = clock_mod.advance(
+                new.clock.day, new.clock.hour, new.clock.minute, minutes
+            )
+            new.clock.day, new.clock.hour, new.clock.minute = d, h, m
+            continue
+
         try:
             cur = _get(new, ch.path)
         except (AttributeError, KeyError):

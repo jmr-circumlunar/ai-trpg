@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 from ..models import CharacterCard, DeltaChange, GameState, StateDelta
 from ..models.enums import DeltaOp, Position
+from ..rules import clock as clock_mod
 from ..rules.dice import DiceEngine
 from ..rules.loader import Rules
 from ..storage import db
@@ -97,12 +98,39 @@ class GameLoop:
         narrations: dict[str, str] = out.get("narrations") or {}
 
         # COMMIT：整回合的 delta 一次合并
+        clock_before = clock_mod.to_minutes(
+            self.state.clock.day, self.state.clock.hour, self.state.clock.minute
+        )
         delta = out.get("state_delta")
         if delta is not None:
             try:
-                self.state = apply_delta(self.state, delta, self.cards)
+                self.state = apply_delta(self.state, delta, self.cards, self.rules.clock)
             except DeltaValidationError as exc:
                 rec.rejected.append("; ".join(exc.errors[:3]))
+
+        # 时间兜底：GM 忘了申报也要往前走，否则宵禁/限时永远不会发生
+        clock_after = clock_mod.to_minutes(
+            self.state.clock.day, self.state.clock.hour, self.state.clock.minute
+        )
+        if clock_after <= clock_before:
+            try:
+                self.state = apply_delta(
+                    self.state,
+                    StateDelta(
+                        turn=t,
+                        changes=[
+                            DeltaChange(
+                                path="clock.advance",
+                                op=DeltaOp.add,
+                                value=self.rules.default_step_minutes,
+                            )
+                        ],
+                    ),
+                    self.cards,
+                    self.rules.clock,
+                )
+            except DeltaValidationError as exc:
+                rec.rejected.append("time: " + "; ".join(exc.errors[:2]))
 
         for (cid, card), action, result in zip(actors, actions, results):
             rec.actors.append(cid)
@@ -143,6 +171,7 @@ class GameLoop:
                     changes=[DeltaChange(path="stage", op=DeltaOp.add, value=1)],
                 ),
                 self.cards,
+                self.rules.clock,
             )
 
     # ── 落库 ────────────────────────────────────────────────

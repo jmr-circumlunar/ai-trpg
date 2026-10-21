@@ -15,11 +15,18 @@ from ..models import CharacterCard, GameState
 _WEEKDAY = ["一", "二", "三", "四", "五", "六", "日"]
 
 
-def compact_state(state: GameState, cards: dict[str, CharacterCard], max_chars: int = 2000) -> str:
+def compact_state(
+    state: GameState,
+    cards: dict[str, CharacterCard],
+    max_chars: int = 2000,
+    phase_label: str = "",
+) -> str:
     """把 GameState 渲染成紧凑文本（硬状态，不可违背）。"""
+    phase = f"（{phase_label}）" if phase_label else ""
     lines = [
         f"地点：{state.scene.location_id}（{state.scene.region}）",
-        f"时间：第 {state.clock.day} 天 {state.clock.hour:02d}:00，天气 {state.clock.weather}",
+        f"时间：第 {state.clock.day} 天 {state.clock.hour:02d}:{state.clock.minute:02d}"
+        f"{phase}，天气 {state.clock.weather}",
         f"幕次：{state.stage}/4　张力：{state.tension}/100",
         f"队伍：金币 {state.party.gold}　补给 {state.party.supplies}",
     ]
@@ -74,9 +81,14 @@ def gm_system(world_name: str, era: str, style: str, taboos: list[str]) -> str:
 只输出 JSON，不要 markdown 代码块，不要解释。"""
 
 
-def gm_scene_user(state: GameState, cards: dict[str, CharacterCard], turn: int) -> str:
+def gm_scene_user(
+    state: GameState,
+    cards: dict[str, CharacterCard],
+    turn: int,
+    phase_label: str = "",
+) -> str:
     return f"""# 硬状态（事实，不可违背）
-{compact_state(state, cards)}
+{compact_state(state, cards, phase_label=phase_label)}
 
 # 本回合任务
 describe_scene（第 {turn} 回合）：写 2~4 句当前场景，给玩家一个可行动的局面。
@@ -182,6 +194,8 @@ def gm_narrate_batch_user(
     cards: dict[str, CharacterCard],
     items: list[dict],
     turn: int,
+    phase_label: str = "",
+    steps: list[dict] | None = None,
 ) -> str:
     """一次处理本回合所有玩家的行动与判定（避免 N 次串行调用）。"""
     lines = []
@@ -192,8 +206,13 @@ def gm_narrate_batch_user(
         )
     actions_block = "\n".join(lines)
 
+    step_hint = " / ".join(str(s["minutes"]) for s in (steps or [])) or "5 / 10 / 30 / 60 / 240 / 480"
+    step_detail = "、".join(
+        f"{s['minutes']}（{s['label']}）" for s in (steps or [])
+    ) or "5 / 10 / 30 / 60 / 240 / 480"
+
     return f"""# 硬状态（事实，不可违背）
-{compact_state(state, cards)}
+{compact_state(state, cards, phase_label=phase_label)}
 
 # 本回合全部行动与判定（已定，不可改）
 {actions_block}
@@ -220,8 +239,14 @@ state_delta 只能使用以下路径，且必须符合类型：
 - party.flags（**字符串列表，用 add 追加单个字符串**）
 - party.reputation（{{势力名: 整数}}）
 - tension（整数）、stage（整数）、scene.location_id（已有地点 id）、quests（任务对象列表）
-（不要修改 version / session_id / world）
+- **clock.advance（分钟数，只能前进）**：按本回合实际消耗申报，档位 {step_detail}
+（不要修改 version / session_id / world；不要直接改 clock.day/hour/minute）
 约束：单回合 tension 变化不超过 ±10；没有明确的大事时不要扣 HP。
+
+# 时间申报（必做）
+判断本回合行动实际花了多久，用 `clock.advance` 申报（只取 {step_hint} 中的一个值）。
+只需一次，不要为每个角色各报一次；如果多人分散行动，取最长的那条。
+例：{{"path": "clock.advance", "op": "add", "value": 30}}
 
 # 输出格式
 {{"narrations": [{{"actor_id": "chr_p1", "text": "…"}}],

@@ -1,0 +1,48 @@
+schema_version: 1
+
+# 时间推进：代码给基准，GM 按行动申报，代码夹取（只能前进、单回合 ≤ 上限）
+default_step_minutes: 10   # GM 没申报时，代码兜底推进
+max_step_minutes: 480      # 单回合上限（8 小时）
+min_step_minutes: 5
+
+# GM 可选的申报档位（写进 prompt，便于模型选择）
+allowed_steps:
+  - {minutes: 5, label: 环视/寒暄}
+  - {minutes: 10, label: 搜查/交谈}
+  - {minutes: 30, label: 审问/拆解/包扎}
+  - {minutes: 60, label: 穿过一个城区/潜行穿越}
+  - {minutes: 240, label: 长途赶路/深入地下}
+  - {minutes: 480, label: 扎营过夜}
+
+# 时段：影响 DC（按技能），不影响 tension（不制造"凭空变化"）
+phases:
+  dawn:
+    label: 黎明
+    from: 5
+    to: 7
+    mod: {}
+  morning:
+    label: 上午
+    from: 8
+    to: 11
+    mod: {}
+  afternoon:
+    label: 午后
+    from: 12
+    to: 16
+    mod: {}
+  dusk:
+    label: 黄昏
+    from: 17
+    to: 19
+    mod: {潜行: -2, 观察: -1}
+  night:
+    label: 入夜
+    from: 20
+    to: 22
+    mod: {潜行: -2, 交涉: 2}
+  deep_night:
+    label: 深夜
+    from: 23
+    to: 4
+    mod: {潜行: -3, 交涉: 3, 威吓: 2}

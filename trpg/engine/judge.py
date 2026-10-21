@@ -46,7 +46,15 @@ def judge(
     skill_bonus = ext.skills.get(skill, 0) if skill else 0
 
     action_type = rules.action_type_for_skill(skill)
-    dc = rules.dc(action_type, state.stage, action.intent, situation_delta)
+    phase = rules.phase_of(state.clock.hour)
+    dc = rules.dc(
+        action_type,
+        state.stage,
+        action.intent,
+        situation_delta,
+        skill=skill,
+        phase=phase,
+    )
 
     expr = f"1d{rules.dice_sides}"
     rolls, raw = dice.roll(expr)
@@ -58,6 +66,7 @@ def judge(
         actor_id=action.actor_id,
         skill=skill,
         action_type=action_type,
+        phase=phase,
         attr=attr,
         attr_mod=attr_mod,
         skill_bonus=skill_bonus,

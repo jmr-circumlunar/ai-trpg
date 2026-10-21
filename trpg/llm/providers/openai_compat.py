@@ -37,7 +37,12 @@ class OpenAICompatAdapter:
         return {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
 
     def _build_payload(
-        self, messages: list[dict], model: str, temperature: float, max_tokens: int
+        self,
+        messages: list[dict],
+        model: str,
+        temperature: float,
+        max_tokens: int,
+        extra_override: dict | None = None,
     ) -> dict:
         payload = {
             "model": model,
@@ -47,8 +52,11 @@ class OpenAICompatAdapter:
         }
         if self._json_mode is not False:
             payload["response_format"] = {"type": "json_object"}
-        if self.extra:
-            payload.update(self.extra)
+        merged = dict(self.extra)
+        if extra_override:
+            merged.update(extra_override)
+        if merged:
+            payload.update(merged)
         return payload
 
     def _check_business_error(self, data: dict) -> None:
@@ -73,8 +81,11 @@ class OpenAICompatAdapter:
         model: str,
         temperature: float = 0.9,
         max_tokens: int = 1200,
+        extra_override: dict | None = None,
     ) -> ChatResult:
-        payload = self._build_payload(messages, model, temperature, max_tokens)
+        payload = self._build_payload(
+            messages, model, temperature, max_tokens, extra_override
+        )
 
         try:
             data = post_with_retry(
@@ -101,7 +112,9 @@ class OpenAICompatAdapter:
         if result.finish_reason == "length" and max_tokens < 4000:
             if self._on_retry:
                 self._on_retry(None)
-            return self.chat(messages, model, temperature, int(max_tokens * 1.6))
+            return self.chat(
+                messages, model, temperature, int(max_tokens * 1.6), extra_override
+            )
 
         return result
 

@@ -20,7 +20,9 @@ class FakeAdapter:
         self.exc = exc
         self.models: list[str] = []
 
-    def chat(self, messages, model, temperature=0.9, max_tokens=1200) -> ChatResult:
+    def chat(
+        self, messages, model, temperature=0.9, max_tokens=1200, extra_override=None
+    ) -> ChatResult:
         self.models.append(model)
         if self.exc:
             raise self.exc
