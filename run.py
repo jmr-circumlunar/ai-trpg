@@ -25,8 +25,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 from trpg.engine.loop import GameLoop  # noqa: E402
-from trpg.llm import MockLLM, MiniMaxClient  # noqa: E402
-from trpg.llm.env import llm_settings  # noqa: E402
+from trpg.llm import AgentLLM, LLMConfig, MockLLM  # noqa: E402
 from trpg.models import CharacterRuntime, GameState, Party, Scene, WorldRef  # noqa: E402
 from trpg.rules.loader import Rules  # noqa: E402
 from trpg.storage import db  # noqa: E402
@@ -87,15 +86,14 @@ def build_client(args, cards, rules):
     if args.provider == "mock":
         return MockLLM(args.seed)
 
-    settings = llm_settings(ROOT)
-    return MiniMaxClient(
-        api_key=settings["api_key"],
-        cards=cards,
-        base_url=args.base_url or settings["base_url"],
-        model=args.model or settings["model"],
-        model_player=args.model_player or settings["model_player"],
+    config = LLMConfig(ROOT)
+    return AgentLLM(
+        config,
+        cards,
         skills=list(rules.skill_attr.keys()),
         taboos=TABOOS,
+        provider=None if args.provider == "auto" else args.provider,
+        model=args.model,
     )
 
 
@@ -149,9 +147,10 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     usage = getattr(llm, "usage", None)
     if usage:
+        net_retry = int(getattr(getattr(llm, "config", None), "net_retry", 0) or 0)
         print(
             f"LLM 调用    {usage['calls']} 次｜JSON 重试 {usage['retry']}"
-            f"｜网络重试 {usage.get('net_retry', 0)}｜降级 {usage['fail']}"
+            f"｜网络重试 {net_retry}｜降级 {usage['fail']}"
             f"｜tokens in {usage['in']} / out {usage['out']}"
         )
         if usage["fail"]:
@@ -169,13 +168,15 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     run = sub.add_parser("run", help="跑一局")
-    run.add_argument("--provider", choices=["mock", "minimax"], default="mock")
+    run.add_argument(
+        "--provider",
+        default="mock",
+        help="mock | auto | minimax | deepseek | qwen | ollama（见 config/providers.yaml）",
+    )
     run.add_argument("--seed", default="42", help="随机种子（同 seed 骨架一致）")
-    run.add_argument("--turns", type=int, default=None, help="回合数（minimax 默认 3）")
+    run.add_argument("--turns", type=int, default=None, help="回合数（真实模型默认 3）")
     run.add_argument("--players", type=int, default=4)
-    run.add_argument("--model", default=None, help="覆盖 MINIMAX_MODEL")
-    run.add_argument("--model-player", default=None, help="玩家 Agent 单独模型")
-    run.add_argument("--base-url", default=None, help="覆盖 MINIMAX_BASE_URL")
+    run.add_argument("--model", default=None, help="覆盖默认模型名")
     run.add_argument("--quiet", action="store_true", help="只打印判定，不打印叙事")
     run.add_argument("--db", default="run.db")
     run.add_argument("--no-db", action="store_true")

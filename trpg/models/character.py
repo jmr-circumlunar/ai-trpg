@@ -6,10 +6,15 @@ from .equipment import EquipmentInstance
 
 
 class ModelConfig(BaseModel):
-    provider: str = "deepseek"
-    model: str = "deepseek-chat"
-    temperature: float = 0.9
-    max_tokens: int = 800
+    """角色级模型配置。空字符串/0 表示「跟随全局默认」。
+
+    页面上就是一个 provider 下拉 + model 输入 + 温度滑块。
+    """
+
+    provider: str = ""
+    model: str = ""
+    temperature: float | None = None
+    max_tokens: int = 0
 
 
 class AIExtended(BaseModel):
