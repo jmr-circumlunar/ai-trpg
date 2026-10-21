@@ -147,6 +147,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"HP          {hp_line}")
     print(f"判定分布    {dict(counter)}")
     print(f"骰子状态    {loop.dice.rng_state}")
+    if hasattr(llm, "memory"):
+        print(f"记忆参数    {llm.memory.describe()}")
 
     if records:
         avg_ms = sum(r.elapsed_ms for r in records) / len(records)

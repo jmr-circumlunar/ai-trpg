@@ -12,6 +12,7 @@ from typing import Any
 from ..models import CharacterCard, GameState, PlayerAction, StateDelta
 from ..models.enums import Intent
 from ..memory.recall import hybrid_recall
+from ..memory.settings import MemorySettings
 from . import prompts
 from .config import LLMConfig, ModelSpec
 from .providers import extract_json
@@ -53,6 +54,7 @@ class AgentLLM:
         vectors=None,
         seeds: list[dict] | None = None,
         seed: str | int = 0,
+        memory: MemorySettings | None = None,
     ) -> None:
         self.config = config
         self.cards = cards
@@ -66,6 +68,7 @@ class AgentLLM:
         self.vectors = vectors
         self.recall_log: list[dict] = []  # 每次回忆的记录，供 trace 排查
         self._last_recall = None
+        self.memory = memory or MemorySettings.load(getattr(config, "root", "."))
         self.seeds = list(seeds or [])
         self.seed_rng = random.Random(f"{seed}:seeds")
         self._used_seeds: set[str] = set()
@@ -345,7 +348,18 @@ class AgentLLM:
     ):
         if tool == "recall":
             query = str(args.get("query") or "").strip()
-            result = hybrid_recall(query, actor_id, self.events, self.vectors)
+            result = hybrid_recall(
+                query,
+                actor_id,
+                self.events,
+                self.vectors,
+                limit=self.memory.top_k,
+                vector_k=self.memory.vector_top_k,
+                rrf_k=self.memory.rrf_k,
+                important_limit=self.memory.important_limit,
+                important_threshold=self.memory.important_threshold,
+                recent_limit=self.memory.recent_limit,
+            )
             self.recall_log.append(
                 {
                     "turn": turn,
@@ -421,7 +435,7 @@ class AgentLLM:
         scratch: list[str] = []
         recalled: list[str] = []
 
-        for step in range(self.MAX_STEPS):
+        for step in range(self.memory.max_steps):
             user = prompts.pc_user(
                 state,
                 card,
@@ -430,7 +444,8 @@ class AgentLLM:
                 recalled or None,
                 self._summaries,
                 previous,
-            )
+                self.memory.recent_turns,
+                )
             if scratch:
                 user += "\n\n# 你已经查到的\n" + "\n".join(f"- {x}" for x in scratch)
 
@@ -516,8 +531,9 @@ class AgentLLM:
             self.usage["fail"] += 1
             return {"summaries": [], "new_entities": []}
 
-    def maybe_summarize(self, turn: int, window: int = SUMMARY_EVERY) -> None:
+    def maybe_summarize(self, turn: int, window: int | None = None) -> None:
         """每 `window` 回合把积累的原文压成一条回顾，控制上下文长度。"""
+        window = int(window or self.memory.summary_every)
         if window <= 0 or turn % window != 0 or not self._recent_public:
             return
 
@@ -537,6 +553,6 @@ class AgentLLM:
             joined = " ".join(t for t in texts if t)
             if joined:
                 self._summaries.append(f"第{turn - window + 1}~{turn}回合：{joined}")
-                self._summaries = self._summaries[-SUMMARY_KEEP:]
+                self._summaries = self._summaries[-self.memory.chapter_keep :]
         except Exception as exc:  # noqa: BLE001
             self._last_error = f"summarize: {exc}"

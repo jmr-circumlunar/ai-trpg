@@ -219,11 +219,13 @@ def pc_user(
     memories: list[str] | None = None,
     chapter: list[str] | None = None,
     previous: list[str] | None = None,
+    recent_turns: int = 3,
 ) -> str:
     ext = card.ext
     hp_max = ext.hp_max
     inv = "、".join(e.name_flavor or e.template_id for e in ext.equipment) or "空手"
-    recent = "\n".join(f"- {x}" for x in public_recent[-3:]) or "（故事刚开始）"
+    window = max(1, int(recent_turns or 3))
+    recent = "\n".join(f"- {x}" for x in public_recent[-window:]) or "（故事刚开始）"
     chapter_block = (
         "\n".join(f"- {c}" for c in chapter) if chapter else "（还没有更早的回顾）"
     )

@@ -1,0 +1,20 @@
+schema_version: 1
+
+# 记忆与上下文参数（调这里，不用改代码）
+# 改完跑同一 seed 的两组对比，就能看出参数对叙事质量的影响
+
+short_term:
+  recent_turns: 3        # prompt 里常驻的最近回合数（这些是"完全记得"的）
+  summary_every: 5       # 每几回合生成一条分章摘要
+  chapter_keep: 4        # 保留几条分章摘要（更早的被丢弃）
+
+recall:
+  top_k: 5               # 最终注入条数
+  vector_top_k: 4        # 向量候选数（进 RRF 前的 top-k）
+  important_limit: 3     # 结构化候选里"重要的事"取几条
+  important_threshold: 7 # 重要度阈值（1~10，>= 才进 important）
+  recent_limit: 5        # 结构化候选里"最近的事"取几条
+  rrf_k: 60              # RRF 平滑常数（越大越平缓）
+
+agent:
+  max_steps: 3           # ReAct 最多几轮（调大可看更多思考，费 token）

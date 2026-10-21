@@ -62,8 +62,15 @@ def hybrid_recall(
     vectors: VectorStore | None,
     limit: int = 6,
     vector_k: int = 4,
+    rrf_k: int = RRF_K,
+    important_limit: int = 3,
+    important_threshold: int = 7,
+    recent_limit: int = 5,
 ) -> RecallResult:
-    """按角色召回：结构化候选 + 向量候选，RRF 融合。"""
+    """按角色召回：结构化候选 + 向量候选，RRF 融合。
+
+    所有数量参数都来自 `config/memory.yaml`，便于调参对比。
+    """
 
     result = RecallResult(query=query)
     rank_lists: list[list[RecallItem]] = []
@@ -72,8 +79,10 @@ def hybrid_recall(
     # 1) 结构化候选（recent + important），各自是一个排序列表
     if events is not None:
         try:
-            important = events.important(char_id, limit=3)
-            recent = events.recent(char_id, limit=5)
+            important = events.important(
+                char_id, limit=important_limit, threshold=important_threshold
+            )
+            recent = events.recent(char_id, limit=recent_limit)
         except Exception:  # noqa: BLE001
             important, recent = [], []
 
@@ -121,7 +130,7 @@ def hybrid_recall(
     for ranked in rank_lists:
         for rank, item in enumerate(ranked):
             key = item.text
-            contribution = 1.0 / (RRF_K + rank + 1)
+            contribution = 1.0 / (rrf_k + rank + 1)
             if key in fused:
                 fused[key].score += contribution
             else:
@@ -138,6 +147,7 @@ def hybrid_recall(
     result.debug.update(
         {
             "char_id": char_id,
+            "rrf_k": rrf_k,
             "structured_candidates": len(structured_ids),
             "rank_lists": len(rank_lists),
             "fused": len(fused),
