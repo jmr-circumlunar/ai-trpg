@@ -6,7 +6,8 @@ defaults:
   model: MiniMax-M3.1-Flash
   temperature: 0.9
   # 思考深度：low / medium / high（仅推理模型有效，空 = 不限）
-  reasoning_effort: low
+  # S1 定为 medium：这个项目要看的就是「每个角色每回合怎么想」，不能用 low 换速度
+  reasoning_effort: medium
 
 providers:
   minimax:

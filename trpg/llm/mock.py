@@ -27,6 +27,13 @@ class MockLLM:
         self.seed = str(seed)
         self._rng = random.Random(f"{self.seed}:mock")  # 场景/叙事用（串行调用，安全）
         self._actor_rngs: dict[tuple[str, int], random.Random] = {}
+        self._summaries: list[str] = []
+
+    def maybe_summarize(self, turn: int, window: int = 5) -> None:
+        if window <= 0 or turn % window != 0:
+            return
+        self._summaries.append(f"第{turn - window + 1}~{turn}回合：队伍仍在原地打转。")
+        self._summaries = self._summaries[-4:]
 
     def _actor_rng(self, actor_id: str, turn: int) -> random.Random:
         """每个 (actor, turn) 一个独立 RNG。
@@ -46,6 +53,15 @@ class MockLLM:
         return {
             "narration": self._rng.choice(_SCENES),
             "hooks": [self._rng.choice(["有人刚离开", "门没锁", "地上有拖痕"])],
+            "present_npcs": [],
+        }
+
+    def npc_action(self, npc: dict, state: GameState, turn: int) -> dict:
+        return {
+            "id": str(npc.get("id") or ""),
+            "name": str(npc.get("name") or ""),
+            "action": "站在原地，没有动作",
+            "speech": "",
         }
 
     def narrate_batch(
@@ -54,6 +70,7 @@ class MockLLM:
         actions: list[PlayerAction],
         results: list,
         turn: int,
+        npc_moves: list[dict] | None = None,
     ) -> dict:
         narrations: dict[str, str] = {}
         changes: list[dict] = []

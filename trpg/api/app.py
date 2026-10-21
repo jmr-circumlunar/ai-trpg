@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from ..engine.loop import GameLoop, TurnRecord
 from ..game import build_cards, build_llm, build_state
 from ..rules.loader import Rules
+from ..storage.memory import EventStore
 from ..world import WorldPackError, discover_worlds, load_world
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,6 +39,7 @@ class Session:
     cards: dict
     loop: GameLoop
     records: list[TurnRecord] = field(default_factory=list)
+    events: Any = None
 
     @property
     def state(self):
@@ -135,12 +137,23 @@ def create_session(req: CreateSessionReq) -> dict:
 
     cards = build_cards(req.players)
     state = build_state(pack, cards, req.era)
+    store = EventStore(None, state.session_id)
     llm = build_llm(
-        ROOT, rules, pack, cards, req.provider, req.model, req.seed, req.reasoning_effort
+        ROOT,
+        rules,
+        pack,
+        cards,
+        req.provider,
+        req.model,
+        req.seed,
+        req.reasoning_effort,
+        events=store,
     )
-    loop = GameLoop(rules, cards, state, llm, seed=req.seed)
+    loop = GameLoop(rules, cards, state, llm, seed=req.seed, events=store)
 
-    session = Session(sid=state.session_id, pack=pack, cards=cards, loop=loop)
+    session = Session(
+        sid=state.session_id, pack=pack, cards=cards, loop=loop, events=store
+    )
     app.state.sessions[session.sid] = session
     return session.snapshot()
 
@@ -165,6 +178,9 @@ async def advance(sid: str) -> dict:
             {
                 "id": cid,
                 "name": card.data.name,
+                "profession": card.ext.profession,
+                "thought": rec.thoughts[i] if i < len(rec.thoughts) else "",
+                "action": rec.actions[i] if i < len(rec.actions) else "",
                 "outcome": rec.outcomes[i],
                 "narration": rec.narration[i] if i < len(rec.narration) else "",
             }
@@ -191,6 +207,8 @@ def get_trace(sid: str) -> dict:
                 "turn": r.turn,
                 "scene": r.scene,
                 "actors": r.actors,
+                "thoughts": r.thoughts,
+                "actions": r.actions,
                 "outcomes": r.outcomes,
                 "narration": r.narration,
                 "rejected": r.rejected,
@@ -200,6 +218,14 @@ def get_trace(sid: str) -> dict:
             for r in session.records
         ],
         "usage": getattr(session.loop.llm, "usage", {}),
+        "memories": (
+            {
+                cid: [e.render() for e in session.events.all_for(cid)]
+                for cid in session.cards
+            }
+            if session.events is not None
+            else {}
+        ),
     }
 
 

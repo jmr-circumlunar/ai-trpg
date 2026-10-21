@@ -86,16 +86,22 @@ def gm_scene_user(
     cards: dict[str, CharacterCard],
     turn: int,
     phase_label: str = "",
+    npcs: list[dict] | None = None,
 ) -> str:
+    npcs_block = gm_scene_present_npcs_block(npcs or [])
     return f"""# 硬状态（事实，不可违背）
 {compact_state(state, cards, phase_label=phase_label)}
+
+# 本回合在场 NPC 候选（只能从这里选，最多 2 个）
+{npcs_block}
 
 # 本回合任务
 describe_scene（第 {turn} 回合）：写 2~4 句当前场景，给玩家一个可行动的局面。
 不要替玩家做决定，不要宣布任何成功或失败的结果。
+另外挑 0~2 个此刻应该在场的 NPC（他们会各自行动，不要替他们说话）。
 
 # 输出格式
-{{"narration": "…", "hooks": ["…"]}}"""
+{{"narration": "…", "hooks": ["…"], "present_npcs": ["npc_id"]}}"""
 
 
 def gm_narrate_user(
@@ -165,18 +171,40 @@ def pc_system(card: CharacterCard, skills: list[str], eras: str = "") -> str:
 - skill 只能从这些里选：{"、".join(skills)}；不适用就填 null。
 - 不得替其他角色行动，不得宣布自己成功。
 - **你必须主动推进自己的目标**：整回合只做「观察」「等待」是浪费。没有更好的办法时，就制造一个机会。
+- **thought 必须是中文**，且是角色的内心话（第一人称、口语、可带偏见），不是旁白也不是推理稿。≤ 40 字。
 - 篇幅：thought ≤ 40 字，action ≤ 60 字，approach ≤ 20 字。**JSON 字符串内不要换行**（用空格代替），否则会被截断。
 {eras}"""
 
 
-def pc_user(state: GameState, card: CharacterCard, public_recent: list[str], turn: int) -> str:
+def pc_user(
+    state: GameState,
+    card: CharacterCard,
+    public_recent: list[str],
+    turn: int,
+    memories: list[str] | None = None,
+    chapter: list[str] | None = None,
+) -> str:
     ext = card.ext
     hp_max = ext.hp_max
     inv = "、".join(e.name_flavor or e.template_id for e in ext.equipment) or "空手"
     recent = "\n".join(f"- {x}" for x in public_recent[-2:]) or "（故事刚开始）"
+    memory_block = (
+        "\n".join(f"- {m}" for m in memories)
+        if memories
+        else "（你还什么都没经历）"
+    )
+    chapter_block = (
+        "\n".join(f"- {c}" for c in chapter) if chapter else "（还没有更早的回顾）"
+    )
 
-    return f"""# 你知道的（最近两回合公开叙述）
+    return f"""# 更早发生了什么（分章回顾）
+{chapter_block}
+
+# 你知道的（最近两回合公开叙述）
 {recent}
+
+# 你的记忆（只有你知道，别人不知道）
+{memory_block}
 
 # 你的状态
 HP {ext.hp}/{hp_max}　理智 {ext.sanity}/{ext.sanity_max}　装备：{inv}
@@ -196,8 +224,19 @@ def gm_narrate_batch_user(
     turn: int,
     phase_label: str = "",
     steps: list[dict] | None = None,
+    npc_moves: list[dict] | None = None,
 ) -> str:
     """一次处理本回合所有玩家的行动与判定（避免 N 次串行调用）。"""
+    npc_block = "（本回合没有 NPC 行动）"
+    if npc_moves:
+        rows = []
+        for m in npc_moves:
+            row = f"- {m.get('name')}：{m.get('action') or '没有动作'}"
+            if m.get("speech"):
+                row += f"　说：「{m['speech']}」"
+            rows.append(row)
+        npc_block = "\n".join(rows)
+
     lines = []
     for i, it in enumerate(items, 1):
         lines.append(
@@ -216,6 +255,9 @@ def gm_narrate_batch_user(
 
 # 本回合全部行动与判定（已定，不可改）
 {actions_block}
+
+# 本回合 NPC 的动向（事实，请织进叙事，不要改写他们的意图）
+{npc_block}
 
 结果档位含义：
 - crit_success：达成意图并额外获益（新线索 / 省资源 / 敌方破绽）
@@ -244,9 +286,19 @@ state_delta 只能使用以下路径，且必须符合类型：
 约束：单回合 tension 变化不超过 ±10；没有明确的大事时不要扣 HP。
 
 # 时间申报（必做）
-判断本回合行动实际花了多久，用 `clock.advance` 申报（只取 {step_hint} 中的一个值）。
-只需一次，不要为每个角色各报一次；如果多人分散行动，取最长的那条。
-例：{{"path": "clock.advance", "op": "add", "value": 30}}
+判断本回合实际花了多久，用 `clock.advance` 申报（只取 {step_hint} 中的一个值）。
+只需一次，不要为每个角色各报一次；多人分散行动时，取最长的那条。
+
+时间**不固定**，按剧情判断：
+- 短暂交锋、几句话 → 5
+- 搜索一处、谈一件事 → 10
+- 审问、拆解、包扎 → 30
+- 换城区、穿越 → 60
+- 长途、深入地底 → 240
+- **扎营睡觉 → 480；睡到下一个时段 → 720；整整一天/昏迷醒来 → 1440**
+- 夜间被事件打断（比如刚躺下就有人敲门）→ 只报 5~30，不要直接跳到天亮
+
+例：{{"path": "clock.advance", "op": "add", "value": 480}}
 
 # 输出格式
 {{"narrations": [{{"actor_id": "chr_p1", "text": "…"}}],
@@ -269,6 +321,54 @@ def arbiter_user(narration: str, state_text: str) -> str:
 
 # 输出格式
 {{"ok": true, "violations": [{{"type": "dead_actor", "detail": "…"}}]}}"""
+
+
+def gm_scene_present_npcs_block(npcs: list[dict]) -> str:
+    """给 GM 的在场 NPC 候选清单。"""
+    if not npcs:
+        return "（这个世界还没有 NPC 数据）"
+    lines = [
+        f"- {n['id']}：{n['name']}｜{'、'.join(n.get('tags') or []) or '无标签'}"
+        for n in npcs
+    ]
+    return "\n".join(lines)
+
+
+def npc_system(npc: dict, world_name: str) -> str:
+    attitude = int(npc.get("attitude", 0) or 0)
+    tone = "敌对" if attitude <= -2 else ("冷淡" if attitude < 1 else "友善")
+    org = npc.get("org") or "无"
+    return f"""# 你在扮演 {npc.get('name')}（{world_name} 的 NPC）
+
+组织：{org}
+你的目标：{npc.get('goal')}
+你的秘密（不会主动说出口，但会影响你的话）：{npc.get('secret')}
+对玩家的态度：{attitude}（{tone}）
+性格：{'、'.join(npc.get('tags') or []) or '普通'}
+
+# 规则
+- 只输出 JSON，全部中文。
+- action：你这一回合做了什么（≤40 字，第三人称看不出你的动机，只写外在行为）。
+- speech：你当场说的话（≤60 字；不想说话就填空字符串）。
+- **你只为自己的目标行动**，不必帮玩家；可以隐瞒、敷衍、绕开、说谎。
+- 不得替玩家决定，不得宣布任何成功或失败。
+
+# 输出格式
+{{"action": "…", "speech": "…"}}"""
+
+
+def npc_user(state: GameState, npc: dict, public_recent: list[str], turn: int) -> str:
+    recent = "\n".join(f"- {x}" for x in public_recent[-2:]) or "（故事刚开始）"
+    return f"""# 现在的局面（第 {turn} 回合）
+地点：{state.scene.location_id}（{state.scene.region}）
+时间：第 {state.clock.day} 天 {state.clock.hour:02d}:{state.clock.minute:02d}
+
+# 最近发生了什么
+{recent}
+
+# 你的任务
+玩家就在附近。按你的目标做一个动作（可以离开、可以搭话、可以装作没看见）。
+只输出 JSON。"""
 
 
 def chronicler_user(turn: int, narration: str) -> str:

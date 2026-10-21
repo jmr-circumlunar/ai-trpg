@@ -100,6 +100,13 @@ class Rules:
     def allowed_steps(self) -> list[dict]:
         return list(self.clock.get("allowed_steps") or [])
 
+    def fallback_minutes(self, action_types: list[str]) -> int:
+        """GM 没申报时间时的兜底：取本回合最"重"的行动类型。"""
+        table = self.clock.get("fallback_by_action_type") or {}
+        values = [int(table.get(t, 0) or 0) for t in action_types]
+        values = [v for v in values if v > 0]
+        return max(values) if values else self.default_step_minutes
+
     def phase_of(self, hour: int) -> str:
         return clock_mod.phase_of(hour, self.phases)
 

@@ -52,6 +52,22 @@ CREATE TABLE IF NOT EXISTS dice_rolls (
     rng_state    TEXT
 );
 
+CREATE TABLE IF NOT EXISTS character_events (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   TEXT,
+    char_id      TEXT,
+    turn         INTEGER,
+    world_day    INTEGER,
+    world_hour   INTEGER,
+    kind         TEXT,
+    summary      TEXT,
+    entities     TEXT,
+    importance   INTEGER DEFAULT 5
+);
+
+CREATE INDEX IF NOT EXISTS idx_char_events
+    ON character_events (session_id, char_id, turn);
+
 CREATE TABLE IF NOT EXISTS agent_calls (
     session_id   TEXT,
     turn         INTEGER,

@@ -30,8 +30,11 @@ class TurnRecord:
     turn: int
     scene: str
     actors: list[str] = field(default_factory=list)
+    thoughts: list[str] = field(default_factory=list)
+    actions: list[str] = field(default_factory=list)
     outcomes: list[str] = field(default_factory=list)
     narration: list[str] = field(default_factory=list)
+    npc_moves: list[dict] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)
     version: int = 0
     elapsed_ms: int = 0
@@ -47,6 +50,7 @@ class GameLoop:
         llm,
         seed: int | str = 0,
         conn: sqlite3.Connection | None = None,
+        events=None,
     ) -> None:
         self.rules = rules
         self.cards = cards
@@ -56,6 +60,7 @@ class GameLoop:
         self.conn = conn
         self.seed = seed
         self.next_turn = 1
+        self.events = events
 
     # ── 主循环 ──────────────────────────────────────────────
     async def run(self, turns: int) -> list[TurnRecord]:
@@ -69,11 +74,28 @@ class GameLoop:
         t = turn if turn is not None else self.next_turn
         self.next_turn = t + 1
         started = time.perf_counter()
+        turn_day = self.state.clock.day
+        turn_hour = self.state.clock.hour
 
         scene = await asyncio.to_thread(self.llm.describe_scene, self.state, t)
         rec = TurnRecord(turn=t, scene=scene.get("narration", ""))
 
         actors = self._active_actors()
+
+        # ⚡ NPC：在场 NPC 各自按自己的目标行动（独立 Agent，并行）
+        present = scene.get("present_npcs") or []
+        npc_moves: list[dict] = []
+        npc_hook = getattr(self.llm, "npc_action", None)
+        if present and callable(npc_hook):
+            npc_moves = list(
+                await asyncio.gather(
+                    *[
+                        asyncio.to_thread(npc_hook, npc, self.state, t)
+                        for npc in present
+                    ]
+                )
+            )
+            rec.npc_moves = npc_moves
 
         # ⚡ DECLARE：所有玩家同时思考（最耗时的一段）
         declare_started = time.perf_counter()
@@ -93,7 +115,7 @@ class GameLoop:
 
         # NARRATE：合并成一次 GM 调用（串行 N 次是最大瓶颈）
         out = await asyncio.to_thread(
-            self.llm.narrate_batch, self.state, actions, results, t
+            self.llm.narrate_batch, self.state, actions, results, t, npc_moves
         )
         narrations: dict[str, str] = out.get("narrations") or {}
 
@@ -113,6 +135,7 @@ class GameLoop:
             self.state.clock.day, self.state.clock.hour, self.state.clock.minute
         )
         if clock_after <= clock_before:
+            fallback = self.rules.fallback_minutes([r.action_type for r in results])
             try:
                 self.state = apply_delta(
                     self.state,
@@ -122,7 +145,7 @@ class GameLoop:
                             DeltaChange(
                                 path="clock.advance",
                                 op=DeltaOp.add,
-                                value=self.rules.default_step_minutes,
+                                value=fallback,
                             )
                         ],
                     ),
@@ -134,13 +157,25 @@ class GameLoop:
 
         for (cid, card), action, result in zip(actors, actions, results):
             rec.actors.append(cid)
+            rec.thoughts.append(action.thought)
+            rec.actions.append(action.action)
             rec.outcomes.append(f"{result.outcome} ({result.total} vs {result.dc})")
             text = narrations.get(cid, "")
             rec.narration.append(text)
             self._persist(t, cid, action, result, {"narration": text}, scene)
+            self._record_event(cid, action, result, t, turn_day, turn_hour)
             self._resolve_death(cid)
 
         self._maybe_advance_stage(t)
+
+        # 上下文压缩：每 N 回合把旧原文压成一条回顾
+        hook = getattr(self.llm, "maybe_summarize", None)
+        if callable(hook):
+            try:
+                hook(t)
+            except Exception:  # noqa: BLE001
+                pass
+
         rec.version = self.state.version
         rec.elapsed_ms = int((time.perf_counter() - started) * 1000)
         return rec
@@ -156,6 +191,32 @@ class GameLoop:
                 continue
             result.append((cid, card))
         return result
+
+    def _record_event(self, cid: str, action, result, turn: int, day: int, hour: int) -> None:
+        """把本回合的经历写进该角色的记忆（结构化，供后续回忆）。"""
+        if self.events is None:
+            return
+        from ..models.memory import IMPORTANCE_BY_OUTCOME, CharacterEvent
+
+        skill = action.skill or "行动"
+        summary = f"{skill}·{result.outcome}：{(action.action or '')[:40]}"
+        entities = [self.state.scene.location_id]
+        if getattr(action, "target", None):
+            entities.append(str(action.target))
+
+        self.events.add(
+            CharacterEvent(
+                session_id=self.state.session_id,
+                char_id=cid,
+                turn=turn,
+                day=day,
+                hour=hour,
+                kind="action",
+                summary=summary,
+                entities=entities,
+                importance=IMPORTANCE_BY_OUTCOME.get(result.outcome, 5),
+            )
+        )
 
     def _resolve_death(self, cid: str) -> None:
         rt = self.state.characters.get(cid)

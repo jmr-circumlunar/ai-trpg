@@ -68,6 +68,12 @@
   .badge.fail_forward{color:#d08a52; border-color:#5a3f24}
   .badge.failure{color:var(--red); border-color:#4d2a27}
   .act p{margin:2px 0 0; color:#c3c9d4}
+  .think{
+    color:#7f8899; font-style:italic; font-size:13px; margin:0 0 3px;
+    border-left:2px solid #333a47; padding-left:8px;
+  }
+  .think b{color:#9aa3b4; font-style:normal; font-weight:500}
+  .do{color:#a8b0bf; font-size:13px; margin:0 0 4px}
   .kv{display:flex; justify-content:space-between; font-size:13px; padding:3px 0}
   .kv span:last-child{color:var(--gold)}
   .empty{color:var(--dim); font-size:13px; padding:40px 0; text-align:center}
@@ -95,6 +101,11 @@
     <select id="provider">
       <option value="mock">mock（离线）</option>
       <option value="auto" selected>真实模型</option>
+    </select>
+  </label>
+  <label class="sub">连跑
+    <select id="batch">
+      <option>1</option><option selected>3</option><option>5</option><option>10</option>
     </select>
   </label>
   <button id="new">开一局</button>
@@ -170,23 +181,34 @@ async function newSession() {
 
 async function advance() {
   if (!sid) return;
+  const total = Number($("batch").value) || 1;
   const btn = $("advance");
   btn.disabled = true;
-  btn.innerHTML = `<span class="spin"></span>GM 正在推演…`;
-  $("timing").textContent = "";
+  $("new").disabled = true;
+
+  let totalMs = 0;
   try {
-    const r = await fetch(`/api/sessions/${sid}/advance`, { method: "POST" });
-    if (!r.ok) throw new Error(await r.text());
-    const res = await r.json();
-    appendTurn(res);
-    renderState(res.state);
+    for (let i = 0; i < total; i++) {
+      btn.innerHTML = `<span class="spin"></span>第 ${i + 1}/${total} 回合推演中…`;
+      const r = await fetch(`/api/sessions/${sid}/advance`, { method: "POST" });
+      if (!r.ok) throw new Error(await r.text());
+      const res = await r.json();
+      appendTurn(res);
+      renderState(res.state);
+      totalMs += res.elapsed_ms;
+      $("timing").textContent =
+        `已完成 ${i + 1}/${total} 回合，本回合 ${(res.elapsed_ms / 1000).toFixed(1)}s` +
+        `（玩家并行 ${(res.declare_ms / 1000).toFixed(1)}s）`;
+    }
     $("timing").textContent =
-      `本回合 ${(res.elapsed_ms / 1000).toFixed(1)}s（玩家并行 ${(res.declare_ms / 1000).toFixed(1)}s）`;
+      `连跑 ${total} 回合完成，共 ${(totalMs / 1000).toFixed(1)}s，` +
+      `平均 ${(totalMs / total / 1000).toFixed(1)}s/回合`;
   } catch (e) {
     $("timing").textContent = "推进失败：" + e.message;
   } finally {
     btn.disabled = false;
-    btn.textContent = "推进一回合";
+    btn.textContent = "推进";
+    $("new").disabled = false;
   }
 }
 
@@ -196,7 +218,9 @@ function appendTurn(res) {
   div.className = "turn";
   const acts = res.actors.map(a => `
     <div class="act">
-      <div class="who">${a.name}${badge(a.outcome, a.outcome)}</div>
+      <div class="who">${a.name}${a.profession ? `·${a.profession}` : ""}${badge(a.outcome, a.outcome)}</div>
+      ${a.thought ? `<p class="think"><b>心中</b> ${a.thought}</p>` : ""}
+      ${a.action ? `<p class="do">${a.action}</p>` : ""}
       <p>${a.narration || "…"}</p>
     </div>`).join("");
   div.innerHTML = `

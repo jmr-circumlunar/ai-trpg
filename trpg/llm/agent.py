@@ -22,6 +22,10 @@ DEFAULT_SKILLS = [
     "追踪", "学识", "生存", "器械", "撬锁", "意志",
 ]
 
+# 每多少回合压一条回顾、保留几条
+SUMMARY_EVERY = 5
+SUMMARY_KEEP = 4
+
 DEFAULT_TABOOS = [
     "不涉及现实政治与真实人物",
     "不做任何性内容",
@@ -42,6 +46,8 @@ class AgentLLM:
         model: str | None = None,
         reasoning_effort: str | None = None,
         rules=None,
+        events=None,
+        npcs: list[dict] | None = None,
     ) -> None:
         self.config = config
         self.cards = cards
@@ -50,6 +56,8 @@ class AgentLLM:
         self.style = style
         self.world_name = world_name
         self.rules = rules
+        self.events = events
+        self.npcs = list(npcs or [])
         self.default_spec: ModelSpec = config.resolve(
             provider=provider, model=model, reasoning_effort=reasoning_effort
         )
@@ -67,6 +75,7 @@ class AgentLLM:
             "net_retry": 0,
         }
         self._recent_public: list[str] = []
+        self._summaries: list[str] = []  # 分章回顾（每 SUMMARY_EVERY 回合压一条，留最近 4 条）
         self._last_error: str = ""
 
     # ── 基础设施 ────────────────────────────────────────────
@@ -133,12 +142,50 @@ class AgentLLM:
     def _step_options(self) -> list[dict]:
         return list(getattr(self.rules, "allowed_steps", []) or [])
 
+    def _recall(self, actor_id: str) -> list[str]:
+        """回忆自己的经历：重要的事 + 最近的事，按回合去重。
+
+        只查 `actor_id` 自己的记录——隔离靠物理过滤，不靠 prompt 叮嘱。
+        """
+        if self.events is None:
+            return []
+        try:
+            important = self.events.important(actor_id, limit=3)
+            recent = self.events.recent(actor_id, limit=5)
+        except Exception:  # noqa: BLE001
+            return []
+
+        merged: list = []
+        seen: set[tuple[int, str]] = set()
+        for event in [*important, *recent]:
+            key = (event.turn, event.summary)
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(event)
+        return [e.render() for e in merged][:6]
+
     # ── GM ──────────────────────────────────────────────────
+    def _validate_npcs(self, raw) -> list[dict]:
+        """GM 申报的 NPC 必须在 npcs.yaml 里，最多 2 个。"""
+        if not isinstance(raw, list) or not self.npcs:
+            return []
+        by_id = {str(n.get("id")): n for n in self.npcs if n.get("id")}
+        out, seen = [], set()
+        for item in raw:
+            nid = str(item)
+            if nid in by_id and nid not in seen:
+                seen.add(nid)
+                out.append(by_id[nid])
+        return out[:2]
+
     def describe_scene(self, state: GameState, turn: int) -> dict:
         try:
             data = self._chat_json(
                 self._gm_system(state),
-                prompts.gm_scene_user(state, self.cards, turn, self._phase_label(state)),
+                prompts.gm_scene_user(
+                    state, self.cards, turn, self._phase_label(state), self.npcs
+                ),
                 self.default_spec,
                 "scene",
             )
@@ -146,13 +193,17 @@ class AgentLLM:
             if not narration:
                 raise ValueError("narration 为空")
             self._recent_public.append(narration)
-            return {"narration": narration, "hooks": data.get("hooks") or []}
+            return {
+                "narration": narration,
+                "hooks": data.get("hooks") or [],
+                "present_npcs": self._validate_npcs(data.get("present_npcs")),
+            }
         except Exception as exc:
             self.usage["fail"] += 1
             self._last_error = f"describe_scene: {exc}"
             fallback = f"（第 {turn} 回合）四周安静得不太对劲，像是在等谁先动。"
             self._recent_public.append(fallback)
-            return {"narration": fallback, "hooks": []}
+            return {"narration": fallback, "hooks": [], "present_npcs": []}
 
     def narrate_batch(
         self,
@@ -160,6 +211,7 @@ class AgentLLM:
         actions: list[PlayerAction],
         results: list,
         turn: int,
+        npc_moves: list[dict] | None = None,
     ) -> dict:
         """一次调用处理本回合全部玩家的后果叙事。
 
@@ -192,6 +244,7 @@ class AgentLLM:
                     turn,
                     self._phase_label(state),
                     self._step_options(),
+                    npc_moves,
                 ),
                 self.default_spec,
                 "narrate",
@@ -222,6 +275,7 @@ class AgentLLM:
                 "narrations": narrations,
                 "narration_meta": data.get("narration_meta") or {},
                 "state_delta": delta,
+                "npc_moves": npc_moves or [],
             }
         except Exception as exc:
             self.usage["fail"] += 1
@@ -249,7 +303,14 @@ class AgentLLM:
         try:
             data = self._chat_json(
                 prompts.pc_system(card, self.skills),
-                prompts.pc_user(state, card, self._recent_public, turn),
+                prompts.pc_user(
+                    state,
+                    card,
+                    self._recent_public,
+                    turn,
+                    self._recall(actor_id),
+                    self._summaries,
+                ),
                 spec,
                 "player",
             )
@@ -281,7 +342,28 @@ class AgentLLM:
                 intent=Intent.careful,
             )
 
-    # ── 编年史 ──────────────────────────────────────────────
+    # ── NPC（独立 Agent）────────────────────────────────────
+    def npc_action(self, npc: dict, state: GameState, turn: int) -> dict:
+        """让一个 NPC 按自己的目标行动。它们是独立 Agent，不是 GM 的台词道具。"""
+        base = {"id": str(npc.get("id") or ""), "name": str(npc.get("name") or "")}
+        try:
+            data = self._chat_json(
+                prompts.npc_system(npc, self.world_name),
+                prompts.npc_user(state, npc, self._recent_public, turn),
+                self.default_spec,
+                "player",
+            )
+            return {
+                **base,
+                "action": str(data.get("action") or "").strip(),
+                "speech": str(data.get("speech") or "").strip(),
+            }
+        except Exception as exc:  # noqa: BLE001
+            self.usage["fail"] += 1
+            self._last_error = f"npc_action[{base['id']}]: {exc}"
+            return {**base, "action": "", "speech": ""}
+
+    # ── 编年史 / 上下文压缩 ─────────────────────────────────
     def summarize(self, state: GameState, turn: int) -> dict:
         text = self._recent_public[-1] if self._recent_public else ""
         if not text:
@@ -296,3 +378,28 @@ class AgentLLM:
         except Exception:
             self.usage["fail"] += 1
             return {"summaries": [], "new_entities": []}
+
+    def maybe_summarize(self, turn: int, window: int = SUMMARY_EVERY) -> None:
+        """每 `window` 回合把积累的原文压成一条回顾，控制上下文长度。"""
+        if window <= 0 or turn % window != 0 or not self._recent_public:
+            return
+
+        chunk = "\n".join(self._recent_public[-window * 4 :])
+        try:
+            data = self._chat_json(
+                "你把游戏记录压缩成分章回顾，只输出 JSON。",
+                prompts.chronicler_user(turn, chunk),
+                self.default_spec,
+                "summary",
+            )
+            texts = [
+                str(s.get("text") or "").strip()
+                for s in (data.get("summaries") or [])
+                if isinstance(s, dict)
+            ]
+            joined = " ".join(t for t in texts if t)
+            if joined:
+                self._summaries.append(f"第{turn - window + 1}~{turn}回合：{joined}")
+                self._summaries = self._summaries[-SUMMARY_KEEP:]
+        except Exception as exc:  # noqa: BLE001
+            self._last_error = f"summarize: {exc}"

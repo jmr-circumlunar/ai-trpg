@@ -95,7 +95,26 @@ def test_advance_too_small_rejected():
 
 def test_cumulative_over_limit_rejected():
     with pytest.raises(DeltaValidationError):
-        apply_delta(_state(), _advance_delta(300, times=2), None, CFG)
+        apply_delta(_state(), _advance_delta(800, times=2), None, CFG)
+
+
+def test_full_day_jump_allowed():
+    new = apply_delta(_state(), _advance_delta(1440), None, CFG)
+    assert new.clock.day == 2
+    assert (new.clock.hour, new.clock.minute) == (20, 0)
+
+
+def test_over_day_rejected():
+    with pytest.raises(DeltaValidationError):
+        apply_delta(_state(), _advance_delta(1441), None, CFG)
+
+
+def test_fallback_by_action_type():
+    rules = Rules(ROOT)
+    assert rules.fallback_minutes(["contest"]) == 10
+    assert rules.fallback_minutes(["professional"]) == 30
+    assert rules.fallback_minutes(["professional", "contest"]) == 30
+    assert rules.fallback_minutes([]) == rules.default_step_minutes
 
 
 def test_direct_hour_set_rejected():

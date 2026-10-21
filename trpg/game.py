@@ -67,6 +67,7 @@ def build_llm(
     model: str | None = None,
     seed: str | int = 42,
     reasoning_effort: str | None = None,
+    events=None,
 ):
     if provider == "mock":
         return MockLLM(seed)
@@ -83,4 +84,6 @@ def build_llm(
         model=model,
         reasoning_effort=reasoning_effort,
         rules=rules,
+        events=events,
+        npcs=pack.npcs,
     )

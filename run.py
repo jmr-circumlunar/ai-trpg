@@ -29,6 +29,7 @@ from trpg.engine.loop import GameLoop  # noqa: E402
 from trpg.game import build_cards, build_llm, build_state  # noqa: E402
 from trpg.rules.loader import Rules  # noqa: E402
 from trpg.storage import db  # noqa: E402
+from trpg.storage.memory import EventStore  # noqa: E402
 from trpg.world import discover_worlds, load_world  # noqa: E402
 
 
@@ -73,8 +74,17 @@ def cmd_run(args: argparse.Namespace) -> int:
         )
         db.save_state(conn, state)
 
+    store = EventStore(conn, state.session_id)
     llm = build_llm(
-        ROOT, rules, pack, cards, args.provider, args.model, args.seed, args.reasoning_effort
+        ROOT,
+        rules,
+        pack,
+        cards,
+        args.provider,
+        args.model,
+        args.seed,
+        args.reasoning_effort,
+        events=store,
     )
     print(
         f"world={pack.world_id}({pack.name}) era={state.world.era} region={state.scene.region}"
@@ -82,16 +92,29 @@ def cmd_run(args: argparse.Namespace) -> int:
         f" turns={turns} players={args.players}\n"
     )
 
-    loop = GameLoop(rules, cards, state, llm, seed=args.seed, conn=conn)
+    loop = GameLoop(rules, cards, state, llm, seed=args.seed, conn=conn, events=store)
     records = asyncio.run(loop.run(turns))
 
     counter: Counter[str] = Counter()
     for rec in records:
         print(f"\n[回合 {rec.turn}] {rec.scene}")
-        for actor, outcome, narration in zip(rec.actors, rec.outcomes, rec.narration):
+        for move in rec.npc_moves:
+            line = f"  〔NPC〕{move.get('name')}：{move.get('action') or '无动作'}"
+            if move.get("speech"):
+                line += f"　说：「{move['speech']}」"
+            print(line)
+        for i, (actor, outcome, narration) in enumerate(
+            zip(rec.actors, rec.outcomes, rec.narration)
+        ):
             counter[outcome.split(" ")[0]] += 1
             print(f"  {actor}  {outcome}")
             if not args.quiet:
+                thought = rec.thoughts[i] if i < len(rec.thoughts) else ""
+                act = rec.actions[i] if i < len(rec.actions) else ""
+                if thought:
+                    print(f"    心中：{thought}")
+                if act:
+                    print(f"    行动：{act}")
                 print(f"    {narration}")
         for item in rec.rejected:
             print(f"  ! 被拒 delta：{item}")

@@ -1,18 +1,28 @@
 schema_version: 1
 
 # 时间推进：代码给基准，GM 按行动申报，代码夹取（只能前进、单回合 ≤ 上限）
-default_step_minutes: 10   # GM 没申报时，代码兜底推进
-max_step_minutes: 480      # 单回合上限（8 小时）
+default_step_minutes: 10   # GM 没申报时的最后兜底
+max_step_minutes: 1440     # 单回合上限（24 小时，允许"睡一觉"这种跳跃）
 min_step_minutes: 5
 
+# GM 没申报时，按本回合最"重"的行动类型兜底（不是固定 10 分钟）
+fallback_by_action_type:
+  contest: 10
+  professional: 30
+  risky: 10
+  extreme: 30
+
 # GM 可选的申报档位（写进 prompt，便于模型选择）
+# 时间"不固定"：由主持人按剧情判断，同一类行动也可能报 10 或 30
 allowed_steps:
-  - {minutes: 5, label: 环视/寒暄}
+  - {minutes: 5, label: 环视/寒暄/短促一击}
   - {minutes: 10, label: 搜查/交谈}
   - {minutes: 30, label: 审问/拆解/包扎}
   - {minutes: 60, label: 穿过一个城区/潜行穿越}
   - {minutes: 240, label: 长途赶路/深入地下}
   - {minutes: 480, label: 扎营过夜}
+  - {minutes: 720, label: 睡到下一个时段/半天}
+  - {minutes: 1440, label: 整整一天/昏迷后醒来}
 
 # 时段：影响 DC（按技能），不影响 tension（不制造"凭空变化"）
 phases:
