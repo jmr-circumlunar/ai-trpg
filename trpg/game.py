@@ -58,6 +58,35 @@ def build_state(pack: WorldPack, cards: dict, era: str | None = None) -> GameSta
     )
 
 
+def build_memory(
+    root: Path,
+    provider: str = "mock",
+    conn=None,
+    session_id: str = "",
+):
+    """构造向量存储：MiniMax 走真 embedding，其余情况降级为离线哈希。
+
+    降级不是"偷懒"：断网或换供应商时链路仍可跑，测试也不会依赖外部服务。
+    """
+    from .llm import LLMConfig
+    from .memory import HashEmbedder, MiniMaxEmbedder, VectorStore
+
+    if provider == "mock":
+        return VectorStore(conn, session_id, HashEmbedder())
+
+    try:
+        cfg = LLMConfig(root)
+        name = provider if provider != "auto" else str(cfg.defaults.get("provider", "minimax"))
+        pcfg = cfg.providers.get(name) or {}
+        key = cfg.api_key(name)
+        base = pcfg.get("base_url") or ""
+        if pcfg.get("kind") == "minimax" and key and base:
+            return VectorStore(conn, session_id, MiniMaxEmbedder(key, base))
+    except Exception:  # noqa: BLE001
+        pass
+    return VectorStore(conn, session_id, HashEmbedder())
+
+
 def build_llm(
     root: Path,
     rules: Rules,
@@ -68,6 +97,7 @@ def build_llm(
     seed: str | int = 42,
     reasoning_effort: str | None = None,
     events=None,
+    vectors=None,
 ):
     if provider == "mock":
         return MockLLM(seed)
@@ -86,4 +116,5 @@ def build_llm(
         rules=rules,
         events=events,
         npcs=pack.npcs,
+        vectors=vectors,
     )

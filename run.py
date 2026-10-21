@@ -26,7 +26,7 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 from trpg.engine.loop import GameLoop  # noqa: E402
-from trpg.game import build_cards, build_llm, build_state  # noqa: E402
+from trpg.game import build_cards, build_llm, build_memory, build_state  # noqa: E402
 from trpg.rules.loader import Rules  # noqa: E402
 from trpg.storage import db  # noqa: E402
 from trpg.storage.memory import EventStore  # noqa: E402
@@ -75,6 +75,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         db.save_state(conn, state)
 
     store = EventStore(conn, state.session_id)
+    vectors = build_memory(ROOT, args.provider, conn, state.session_id)
     llm = build_llm(
         ROOT,
         rules,
@@ -85,6 +86,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         args.seed,
         args.reasoning_effort,
         events=store,
+        vectors=vectors,
     )
     print(
         f"world={pack.world_id}({pack.name}) era={state.world.era} region={state.scene.region}"
@@ -92,7 +94,9 @@ def cmd_run(args: argparse.Namespace) -> int:
         f" turns={turns} players={args.players}\n"
     )
 
-    loop = GameLoop(rules, cards, state, llm, seed=args.seed, conn=conn, events=store)
+    loop = GameLoop(
+        rules, cards, state, llm, seed=args.seed, conn=conn, events=store, vectors=vectors
+    )
     records = asyncio.run(loop.run(turns))
 
     counter: Counter[str] = Counter()
@@ -118,6 +122,17 @@ def cmd_run(args: argparse.Namespace) -> int:
                 print(f"    {narration}")
         for item in rec.rejected:
             print(f"  ! 被拒 delta：{item}")
+
+        if not args.quiet and hasattr(llm, "recall_log"):
+            for entry in [x for x in llm.recall_log if x.get("turn") == rec.turn]:
+                dbg = entry.get("debug") or {}
+                vhits = dbg.get("vector_hits") or []
+                print(
+                    f"    〔回忆〕{entry['char_id']}：注入 {dbg.get('injected', 0)} 条"
+                    f"（结构化候选 {dbg.get('structured_candidates', 0)}，向量命中 {len(vhits)}）"
+                )
+                for hit in vhits[:2]:
+                    print(f"      · 向量 {hit['score']:.3f} {hit['text'][:40]}")
 
     hp_line = " ".join(f"{cid}={rt.hp}" for cid, rt in loop.state.characters.items())
     print("\n" + "=" * 60)

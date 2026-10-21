@@ -10,6 +10,7 @@ from typing import Any
 
 from ..models import CharacterCard, GameState, PlayerAction, StateDelta
 from ..models.enums import Intent
+from ..memory.recall import hybrid_recall
 from . import prompts
 from .config import LLMConfig, ModelSpec
 from .providers import extract_json
@@ -48,6 +49,7 @@ class AgentLLM:
         rules=None,
         events=None,
         npcs: list[dict] | None = None,
+        vectors=None,
     ) -> None:
         self.config = config
         self.cards = cards
@@ -58,6 +60,9 @@ class AgentLLM:
         self.rules = rules
         self.events = events
         self.npcs = list(npcs or [])
+        self.vectors = vectors
+        self.recall_log: list[dict] = []  # 每次回忆的记录，供 trace 排查
+        self._last_recall = None
         self.default_spec: ModelSpec = config.resolve(
             provider=provider, model=model, reasoning_effort=reasoning_effort
         )
@@ -142,28 +147,32 @@ class AgentLLM:
     def _step_options(self) -> list[dict]:
         return list(getattr(self.rules, "allowed_steps", []) or [])
 
-    def _recall(self, actor_id: str) -> list[str]:
-        """回忆自己的经历：重要的事 + 最近的事，按回合去重。
+    def _recall(self, actor_id: str, turn: int = 0) -> list[str]:
+        """回忆：结构化（重要/最近）+ 向量（情境联想）→ RRF 融合。
 
         只查 `actor_id` 自己的记录——隔离靠物理过滤，不靠 prompt 叮嘱。
+        每次调用都留一条日志，便于判断「没召回到」还是「召回到了但没用」。
         """
-        if self.events is None:
-            return []
-        try:
-            important = self.events.important(actor_id, limit=3)
-            recent = self.events.recent(actor_id, limit=5)
-        except Exception:  # noqa: BLE001
+        if self.events is None and self.vectors is None:
             return []
 
-        merged: list = []
-        seen: set[tuple[int, str]] = set()
-        for event in [*important, *recent]:
-            key = (event.turn, event.summary)
-            if key in seen:
-                continue
-            seen.add(key)
-            merged.append(event)
-        return [e.render() for e in merged][:6]
+        query = self._recent_public[-1] if self._recent_public else ""
+        result = hybrid_recall(query, actor_id, self.events, self.vectors)
+        self._last_recall = result
+        self.recall_log.append(
+            {
+                "turn": turn,
+                "char_id": actor_id,
+                "query": query[:80],
+                "debug": result.debug,
+                "items": [
+                    {"source": i.source, "score": round(i.score, 4), "text": i.text[:60]}
+                    for i in result.items
+                ],
+            }
+        )
+        self.recall_log = self.recall_log[-50:]
+        return result.texts(limit=6)
 
     # ── GM ──────────────────────────────────────────────────
     def _validate_npcs(self, raw) -> list[dict]:
@@ -308,7 +317,7 @@ class AgentLLM:
                     card,
                     self._recent_public,
                     turn,
-                    self._recall(actor_id),
+                    self._recall(actor_id, turn),
                     self._summaries,
                 ),
                 spec,

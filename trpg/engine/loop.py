@@ -51,6 +51,7 @@ class GameLoop:
         seed: int | str = 0,
         conn: sqlite3.Connection | None = None,
         events=None,
+        vectors=None,
     ) -> None:
         self.rules = rules
         self.cards = cards
@@ -61,6 +62,7 @@ class GameLoop:
         self.seed = seed
         self.next_turn = 1
         self.events = events
+        self.vectors = vectors
 
     # ── 主循环 ──────────────────────────────────────────────
     async def run(self, turns: int) -> list[TurnRecord]:
@@ -217,6 +219,19 @@ class GameLoop:
                 importance=IMPORTANCE_BY_OUTCOME.get(result.outcome, 5),
             )
         )
+
+        # 同时写入向量库：字面相似度之外，为"情境联想"留通道
+        if self.vectors is not None:
+            try:
+                self.vectors.add_many(
+                    cid,
+                    [f"第{turn}回合在{self.state.scene.location_id}：{summary}"],
+                    turn=turn,
+                    kind="event",
+                    ref_ids=[f"turn{turn}"],
+                )
+            except Exception:  # noqa: BLE001
+                pass  # embedding 失败不影响主流程
 
     def _resolve_death(self, cid: str) -> None:
         rt = self.state.characters.get(cid)

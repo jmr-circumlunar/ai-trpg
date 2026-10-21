@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from ..engine.loop import GameLoop, TurnRecord
-from ..game import build_cards, build_llm, build_state
+from ..game import build_cards, build_llm, build_memory, build_state
 from ..rules.loader import Rules
 from ..storage.memory import EventStore
 from ..world import WorldPackError, discover_worlds, load_world
@@ -138,6 +138,7 @@ def create_session(req: CreateSessionReq) -> dict:
     cards = build_cards(req.players)
     state = build_state(pack, cards, req.era)
     store = EventStore(None, state.session_id)
+    vectors = build_memory(ROOT, req.provider, None, state.session_id)
     llm = build_llm(
         ROOT,
         rules,
@@ -148,8 +149,9 @@ def create_session(req: CreateSessionReq) -> dict:
         req.seed,
         req.reasoning_effort,
         events=store,
+        vectors=vectors,
     )
-    loop = GameLoop(rules, cards, state, llm, seed=req.seed, events=store)
+    loop = GameLoop(rules, cards, state, llm, seed=req.seed, events=store, vectors=vectors)
 
     session = Session(
         sid=state.session_id, pack=pack, cards=cards, loop=loop, events=store

@@ -68,6 +68,19 @@ CREATE TABLE IF NOT EXISTS character_events (
 CREATE INDEX IF NOT EXISTS idx_char_events
     ON character_events (session_id, char_id, turn);
 
+CREATE TABLE IF NOT EXISTS memory_vectors (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id   TEXT,
+    char_id      TEXT,
+    turn         INTEGER,
+    kind         TEXT,
+    ref_id       TEXT,
+    text         TEXT,
+    embedding    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_mem_vec ON memory_vectors (session_id, char_id);
+
 CREATE TABLE IF NOT EXISTS agent_calls (
     session_id   TEXT,
     turn         INTEGER,
