@@ -48,7 +48,19 @@ class WorldPack:
     npcs: list[dict] = field(default_factory=list)
     professions: list[dict] = field(default_factory=list)
     initial_pool: list[str] = field(default_factory=list)
+    # 分层：core 常驻 prompt；archive 进向量库按需检索
+    core_text: str = ""
+    archive_docs: list[dict] = field(default_factory=list)
     root: Path | None = None
+
+    def region_text(self, region: str) -> str:
+        """当前区域的详情（进入才注入）。"""
+        if not self.root:
+            return ""
+        file = self.root / "regions" / f"{region}.md"
+        if not file.exists():
+            return ""
+        return file.read_text(encoding="utf-8").strip()
 
     # ── 查询 ────────────────────────────────────────────────
     def era(self, era_id: str) -> EraConfig:
@@ -158,6 +170,31 @@ def load_world(world_id: str, root: Path | str) -> WorldPack:
     professions = prof_doc.get("professions") or []
     initial_pool = [str(x) for x in (prof_doc.get("initial_pool") or [])]
 
+    # core：常驻设定（几条 md 顺序拼接，控制总量）
+    core_parts: list[str] = []
+    core_dir = base / "core"
+    if core_dir.is_dir():
+        for f in sorted(core_dir.glob("*.md")):
+            text = f.read_text(encoding="utf-8").strip()
+            if text:
+                core_parts.append(text)
+    core_text = "\n\n".join(core_parts)
+
+    # archive：长文本，进向量库按需检索
+    archive_docs: list[dict] = []
+    archive_dir = base / "archive"
+    if archive_dir.is_dir():
+        for f in sorted(archive_dir.rglob("*.md")):
+            text = f.read_text(encoding="utf-8").strip()
+            if text:
+                archive_docs.append(
+                    {
+                        "path": str(f.relative_to(base)).replace("\\", "/"),
+                        "title": f.stem,
+                        "text": text,
+                    }
+                )
+
     default_era = meta.get("default_era") or next(iter(eras))
     if default_era not in eras:
         raise WorldPackError(f"default_era '{default_era}' 不在 era 列表里")
@@ -178,6 +215,8 @@ def load_world(world_id: str, root: Path | str) -> WorldPack:
         npcs=npcs,
         professions=professions,
         initial_pool=initial_pool,
+        core_text=core_text,
+        archive_docs=archive_docs,
         root=base,
     )
 

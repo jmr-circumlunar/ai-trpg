@@ -93,9 +93,13 @@ class VectorStore:
 
     # ── 检索 ────────────────────────────────────────────────
     def search(
-        self, char_id: str, query: str, top_k: int = 5, min_score: float = 0.0
+        self, char_id: str | list[str], query: str, top_k: int = 5, min_score: float = 0.0
     ) -> list[tuple[MemoryVector, float]]:
-        bucket = self._items.get(char_id) or []
+        """支持多桶（角色记忆 + 世界知识），统一打分后取 top-k。"""
+        keys = list(char_id) if isinstance(char_id, (list, tuple)) else [char_id]
+        bucket: list[MemoryVector] = []
+        for key in keys:
+            bucket.extend(self._items.get(key) or [])
         if not bucket or not query or self.embedder is None:
             return []
 

@@ -64,6 +64,22 @@ def build_memory(
     return VectorStore(conn, session_id, HashEmbedder())
 
 
+def seed_lore(vectors, pack) -> int:
+    """把世界包的 archive 长文写进公共向量桶（不常驻 prompt）。"""
+    docs = getattr(pack, "archive_docs", None) or []
+    if not docs or vectors is None:
+        return 0
+    try:
+        return vectors.add_many(
+            "_lore",
+            [str(d.get("text") or "") for d in docs],
+            kind="lore",
+            ref_ids=[str(d.get("path") or "") for d in docs],
+        )
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def build_llm(
     root: Path,
     rules: Rules,
@@ -96,4 +112,5 @@ def build_llm(
         vectors=vectors,
         seeds=pack.seeds,
         seed=seed,
+        world_core=pack.core_text,
     )

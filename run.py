@@ -26,7 +26,13 @@ if hasattr(sys.stdout, "reconfigure"):
         pass
 
 from trpg.engine.loop import GameLoop  # noqa: E402
-from trpg.game import build_cards, build_llm, build_memory, build_state  # noqa: E402
+from trpg.game import (  # noqa: E402
+    build_cards,
+    build_llm,
+    build_memory,
+    build_state,
+    seed_lore,
+)
 from trpg.rules.loader import Rules  # noqa: E402
 from trpg.storage import db  # noqa: E402
 from trpg.storage.memory import EventStore  # noqa: E402
@@ -76,6 +82,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     store = EventStore(conn, state.session_id)
     vectors = build_memory(ROOT, args.provider, conn, state.session_id)
+    lore_count = seed_lore(vectors, pack)
     llm = build_llm(
         ROOT,
         rules,
@@ -151,6 +158,7 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     mem = getattr(llm, "memory", None) or MemorySettings.load(ROOT)
     print(f"记忆参数    {mem.describe()}")
+    print(f"世界知识    core {len(pack.core_text)} 字常驻 / archive {lore_count} 篇进向量")
 
     if records:
         avg_ms = sum(r.elapsed_ms for r in records) / len(records)

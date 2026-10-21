@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from ..engine.loop import GameLoop, TurnRecord
-from ..game import build_cards, build_llm, build_memory, build_state
+from ..game import build_cards, build_llm, build_memory, build_state, seed_lore
 from ..rules.loader import Rules
 from ..characters import new_card, preset_cards
 from ..models.memory import CharacterEvent
@@ -307,6 +307,7 @@ def create_session(req: CreateSessionReq) -> dict:
 
     store = EventStore(conn, state.session_id)
     vectors = build_memory(ROOT, req.provider, conn, state.session_id)
+    seed_lore(vectors, pack)
     llm = build_llm(
         ROOT,
         rules,

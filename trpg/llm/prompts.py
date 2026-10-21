@@ -59,7 +59,13 @@ def compact_state(
     return text[:max_chars]
 
 
-def gm_system(world_name: str, era: str, style: str, taboos: list[str]) -> str:
+def gm_system(
+    world_name: str,
+    era: str,
+    style: str,
+    taboos: list[str],
+    world_core: str = "",
+) -> str:
     taboo_text = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(taboos)) or "（无）"
     return f"""你是「{world_name}」这个 {era} 世界的主持人（GM）。
 你不决定成败，只负责把已定的事实编织成有意义的场景与后果。
@@ -70,6 +76,9 @@ def gm_system(world_name: str, era: str, style: str, taboos: list[str]) -> str:
 3. 不得违背【硬状态】中的任何事实。
 4. 不得引入【禁忌】中的内容。
 5. 失败不得卡死剧情，必须留下至少一条出路。
+
+# 世界设定（常驻，不可违背）
+{world_core or "（本世界暂无 core 设定）"}
 
 # 基调
 {style}

@@ -1,11 +1,12 @@
 from .embedder import Embedder, HashEmbedder, MiniMaxEmbedder
-from .recall import RecallItem, RecallResult, hybrid_recall
+from .recall import LORE_SCOPE, RecallItem, RecallResult, hybrid_recall
 from .settings import MemorySettings
 from .vector_store import MemoryVector, VectorStore, cosine
 
 __all__ = [
     "Embedder",
     "HashEmbedder",
+    "LORE_SCOPE",
     "MemorySettings",
     "MemoryVector",
     "MiniMaxEmbedder",

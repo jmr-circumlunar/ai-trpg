@@ -55,6 +55,7 @@ class AgentLLM:
         seeds: list[dict] | None = None,
         seed: str | int = 0,
         memory: MemorySettings | None = None,
+        world_core: str = "",
     ) -> None:
         self.config = config
         self.cards = cards
@@ -69,6 +70,7 @@ class AgentLLM:
         self.recall_log: list[dict] = []  # 每次回忆的记录，供 trace 排查
         self._last_recall = None
         self.memory = memory or MemorySettings.load(getattr(config, "root", "."))
+        self.world_core = world_core
         self.seeds = list(seeds or [])
         self.seed_rng = random.Random(f"{seed}:seeds")
         self._used_seeds: set[str] = set()
@@ -143,7 +145,11 @@ class AgentLLM:
 
     def _gm_system(self, state: GameState) -> str:
         return prompts.gm_system(
-            self.world_name, state.world.era, self.style, self.taboos
+            self.world_name,
+            state.world.era,
+            self.style,
+            self.taboos,
+            self.world_core,
         )
 
     def _phase_label(self, state: GameState) -> str:

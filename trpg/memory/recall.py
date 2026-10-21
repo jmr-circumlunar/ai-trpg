@@ -19,6 +19,9 @@ from .vector_store import VectorStore
 
 RRF_K = 60
 
+# 世界知识（archive）放在公共桶，检索时与角色记忆合并
+LORE_SCOPE = "_lore"
+
 
 @dataclass
 class RecallItem:
@@ -105,7 +108,7 @@ def hybrid_recall(
     # 2) 向量候选
     if vectors is not None and query:
         try:
-            hits = vectors.search(char_id, query, top_k=vector_k)
+            hits = vectors.search([char_id, LORE_SCOPE], query, top_k=vector_k)
         except Exception:  # noqa: BLE001
             hits = []
         if hits:
