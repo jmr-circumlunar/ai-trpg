@@ -1,0 +1,78 @@
+schema_version: 1
+
+# 职业属于世界，不属于代码。
+# 一期：initial_pool 固定可选，不随机。
+# 三期：启用 random_weight，初始职业加权随机 + 职业体系（升级/转职）。
+
+# 创建角色时可选（一期内固定）
+initial_pool:
+  - 盗贼
+  - 战士
+  - 学者
+  - 医师
+  - 斥候
+  - 术士
+
+# 三期启用：初始职业加权随机（千分比）
+random_weight:
+  盗贼: 30
+  战士: 25
+  学者: 15
+  医师: 10
+  斥候: 12
+  术士: 8
+
+professions:
+  - id: 盗贼
+    label: 码头撬锁人
+    description: 港区的撬锁人，左手少了两指
+    personality: 话少、不信人、对货物有执念
+    private_goal: 找回被行会没收的妹妹遗物
+    stats: {str: 9, dex: 15, int: 12, wis: 11, cha: 8}
+    skills: {撬锁: 3, 潜行: 2, 观察: 1}
+    tags: [手艺人]
+
+  - id: 战士
+    label: 夜巡老兵
+    description: 退役的夜巡老兵，右耳听不见
+    personality: 直、护短、不肯认错
+    private_goal: 查清三年前那场火灾是谁下的令
+    stats: {str: 15, dex: 11, int: 9, wis: 12, cha: 10}
+    skills: {威吓: 2, 攀爬: 2, 器械: 1}
+    tags: [行会外]
+
+  - id: 学者
+    label: 教会抄书人
+    description: 替灰钟教会抄书的年轻人，眼睛不好
+    personality: 好奇、迂腐、记性极好
+    private_goal: 读到禁书区最里面那一本
+    stats: {str: 8, dex: 10, int: 16, wis: 13, cha: 11}
+    skills: {学识: 3, 观察: 2, 医疗: 1}
+    tags: [教会]
+
+  - id: 医师
+    label: 走街游医
+    description: 走街的游医，箱子比人还重
+    personality: 温和、怕血、嘴上不饶人
+    private_goal: 找到消失了两年的师父
+    stats: {str: 9, dex: 12, int: 13, wis: 15, cha: 11}
+    skills: {医疗: 3, 交涉: 2, 观察: 1}
+    tags: [手艺人]
+
+  - id: 斥候
+    label: 商队带路人
+    description: 给商队带路的外乡人，认得每一条退路
+    personality: 警觉、爱开玩笑、随时准备跑
+    private_goal: 攒够钱离开这座城
+    stats: {str: 11, dex: 15, int: 10, wis: 13, cha: 9}
+    skills: {潜行: 2, 追踪: 2, 生存: 2}
+    tags: [外乡人]
+
+  - id: 术士
+    label: 灰钟符术师
+    description: 被同行称作骗子的符术师，袖里总有东西
+    personality: 浮夸、精于算计、真有点本事
+    private_goal: 证明自己不是骗子
+    stats: {str: 8, dex: 11, int: 15, wis: 14, cha: 14}
+    skills: {学识: 2, 意志: 3, 交涉: 1}
+    tags: [教会外]

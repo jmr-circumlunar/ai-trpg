@@ -55,7 +55,7 @@ def cmd_worlds(_: argparse.Namespace) -> int:
 def cmd_run(args: argparse.Namespace) -> int:
     rules = Rules(ROOT)
     pack = load_world(args.world, ROOT)
-    cards = build_cards(args.players)
+    cards = build_cards(args.players, pack)
     state = build_state(pack, cards, args.era)
     turns = args.turns if args.turns is not None else (3 if args.provider != "mock" else 20)
 
@@ -147,8 +147,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     print(f"HP          {hp_line}")
     print(f"判定分布    {dict(counter)}")
     print(f"骰子状态    {loop.dice.rng_state}")
-    if hasattr(llm, "memory"):
-        print(f"记忆参数    {llm.memory.describe()}")
+    from trpg.memory import MemorySettings  # noqa: PLC0415
+
+    mem = getattr(llm, "memory", None) or MemorySettings.load(ROOT)
+    print(f"记忆参数    {mem.describe()}")
 
     if records:
         avg_ms = sum(r.elapsed_ms for r in records) / len(records)

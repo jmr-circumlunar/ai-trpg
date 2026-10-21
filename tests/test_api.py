@@ -89,3 +89,9 @@ def test_index_page():
     r = client.get("/")
     assert r.status_code == 200
     assert "IRONVALE" in r.text
+
+
+def test_characters_page():
+    r = client.get("/characters")
+    assert r.status_code == 200
+    assert "CHARACTERS" in r.text

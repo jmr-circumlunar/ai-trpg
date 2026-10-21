@@ -22,8 +22,10 @@ from pydantic import BaseModel, Field
 from ..engine.loop import GameLoop, TurnRecord
 from ..game import build_cards, build_llm, build_memory, build_state
 from ..rules.loader import Rules
+from ..characters import new_card, preset_cards
 from ..models.memory import CharacterEvent
 from ..storage import db
+from ..storage.characters import CharacterRepo
 from ..storage.memory import EventStore
 from ..world import WorldPackError, discover_worlds, load_world
 
@@ -81,6 +83,27 @@ class Session:
         }
 
 
+class CharacterForm(BaseModel):
+    """角色卡表单（页面编辑用，全部字段可覆盖职业默认值）。"""
+
+    name: str = Field(min_length=1, max_length=40)
+    profession: str = "盗贼"
+    world: str = "ironvale"
+    description: str | None = None
+    personality: str | None = None
+    private_goal: str | None = None
+    fear: str = ""
+    bottom_line: str = ""
+    origin_region: str | None = None
+    stats: dict[str, int] | None = None
+    skills: dict[str, int] | None = None
+    provider: str = ""
+    model: str = ""
+    reasoning_effort: str = ""
+    hp_max: int = Field(default=11, ge=1, le=50)
+    sanity_max: int = Field(default=10, ge=1, le=50)
+
+
 class CreateSessionReq(BaseModel):
     world: str = "ironvale"
     era: str | None = None
@@ -89,6 +112,7 @@ class CreateSessionReq(BaseModel):
     provider: str = "mock"
     model: str | None = None
     reasoning_effort: str | None = None
+    character_ids: list[str] = Field(default_factory=list)
 
 
 def _new_conn() -> sqlite3.Connection:
@@ -139,6 +163,116 @@ def health() -> dict:
     return {"ok": True, "sessions": len(app.state.sessions)}
 
 
+# ── 角色库 ──────────────────────────────────────────────────
+@app.get("/api/worlds/{world_id}/professions")
+def list_professions(world_id: str) -> dict:
+    try:
+        pack = load_world(world_id, ROOT)
+    except WorldPackError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return {
+        "world": pack.world_id,
+        "professions": [
+            {
+                "id": p.get("id"),
+                "label": p.get("label") or p.get("id"),
+                "description": p.get("description", ""),
+                "stats": p.get("stats") or {},
+                "skills": p.get("skills") or {},
+            }
+            for p in pack.profession_pool()
+        ],
+    }
+
+
+@app.get("/api/characters")
+def list_characters() -> dict:
+    conn = _new_conn()
+    try:
+        return {"characters": CharacterRepo(conn).list()}
+    finally:
+        conn.close()
+
+
+@app.get("/api/characters/{cid}")
+def get_character(cid: str) -> dict:
+    conn = _new_conn()
+    try:
+        repo = CharacterRepo(conn)
+        card = repo.get(cid)
+        if card is None:
+            raise HTTPException(404, f"角色不存在：{cid}")
+        return {"id": cid, "card": card.model_dump()}
+    finally:
+        conn.close()
+
+
+@app.post("/api/characters")
+def create_character(form: CharacterForm) -> dict:
+    conn = _new_conn()
+    try:
+        try:
+            pack = load_world(form.world, ROOT)
+        except WorldPackError:
+            pack = None
+        data = form.model_dump()
+        data.pop("world", None)
+        card = new_card(pack=pack, **data)
+        cid = CharacterRepo(conn).save(card)
+        return {"id": cid, "card": card.model_dump()}
+    finally:
+        conn.close()
+
+
+@app.put("/api/characters/{cid}")
+def update_character(cid: str, form: CharacterForm) -> dict:
+    conn = _new_conn()
+    try:
+        repo = CharacterRepo(conn)
+        if repo.get(cid) is None:
+            raise HTTPException(404, f"角色不存在：{cid}")
+        try:
+            pack = load_world(form.world, ROOT)
+        except WorldPackError:
+            pack = None
+        data = form.model_dump()
+        data.pop("world", None)
+        card = new_card(pack=pack, **data)
+        repo.save(card, cid)
+        return {"id": cid, "card": card.model_dump()}
+    finally:
+        conn.close()
+
+
+@app.delete("/api/characters/{cid}")
+def delete_character(cid: str) -> dict:
+    conn = _new_conn()
+    try:
+        ok = CharacterRepo(conn).delete(cid)
+        if not ok:
+            raise HTTPException(404, f"角色不存在：{cid}")
+        return {"deleted": cid}
+    finally:
+        conn.close()
+
+
+@app.post("/api/characters/presets")
+def seed_presets(world: str = "ironvale", players: int = 6) -> dict:
+    """把世界包的预设小队导入角色库（首次使用时点一下即可）。"""
+    try:
+        pack = load_world(world, ROOT)
+    except WorldPackError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    cards = preset_cards(players, pack=pack)
+    conn = _new_conn()
+    try:
+        repo = CharacterRepo(conn)
+        ids = [repo.save(card) for card in cards.values()]
+        return {"ids": ids, "count": len(ids)}
+    finally:
+        conn.close()
+
+
 # ── 会话 ────────────────────────────────────────────────────
 @app.post("/api/sessions")
 def create_session(req: CreateSessionReq) -> dict:
@@ -148,9 +282,17 @@ def create_session(req: CreateSessionReq) -> dict:
     except WorldPackError as exc:
         raise HTTPException(400, str(exc)) from exc
 
-    cards = build_cards(req.players)
-    state = build_state(pack, cards, req.era)
     conn = _new_conn()
+    if req.character_ids:
+        picked = CharacterRepo(conn).get_many(req.character_ids)
+        if not picked:
+            conn.close()
+            raise HTTPException(400, "指定的角色都不存在，请先在角色库创建")
+        cards = picked
+    else:
+        cards = build_cards(req.players, pack)
+
+    state = build_state(pack, cards, req.era)
     db.save_session(
         conn,
         state.session_id,
@@ -322,4 +464,12 @@ def index() -> str:
     page = ROOT / "static" / "index.html"
     if not page.exists():
         return "<h1>ai-trpg</h1><p>static/index.html 不存在</p>"
+    return page.read_text(encoding="utf-8")
+
+
+@app.get("/characters", response_class=HTMLResponse)
+def characters_page() -> str:
+    page = ROOT / "static" / "characters.html"
+    if not page.exists():
+        return "<h1>ai-trpg</h1><p>static/characters.html 不存在</p>"
     return page.read_text(encoding="utf-8")

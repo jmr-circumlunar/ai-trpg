@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>角色配置 · AI 跑团</title>
+<style>
+  :root{
+    --bg:#12141a; --panel:#1a1d25; --line:#2a2f3a;
+    --ink:#d8dbe2; --dim:#8b93a3; --gold:#c8a45c; --red:#b5544a; --green:#5f9e6e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:14px 22px;
+    border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{margin:0;font-size:16px;letter-spacing:.14em;color:var(--gold);font-weight:600}
+  header .sub{color:var(--dim);font-size:12px}
+  header .grow{flex:1}
+  a.btn,button{background:var(--gold);color:#1a1206;border:0;border-radius:6px;
+    padding:7px 14px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
+  button.danger{background:transparent;color:var(--red);border:1px solid #4d2a27}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  main{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;
+    padding:18px 22px;max-width:1250px;margin:0 auto;align-items:start}
+  aside{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  aside h2{margin:0 0 10px;font-size:12px;letter-spacing:.16em;color:var(--dim)}
+  .item{border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:8px;
+    cursor:pointer;background:#151821;transition:.15s}
+  .item:hover{border-color:#3a4150}
+  .item.active{border-color:var(--gold);background:#1d1c17}
+  .item .n{font-size:13px;font-weight:600}
+  .item .m{font-size:12px;color:var(--dim)}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .field{display:flex;flex-direction:column;gap:4px}
+  .field.full{grid-column:1 / -1}
+  label{font-size:12px;color:var(--dim);letter-spacing:.04em}
+  input,select,textarea{
+    background:#101319;color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none;
+  }
+  textarea{resize:vertical;min-height:52px}
+  input:focus,select:focus,textarea:focus{border-color:#4a5468}
+  .statrow{display:flex;gap:8px;flex-wrap:wrap}
+  .statrow .f{display:flex;flex-direction:column;width:70px}
+  .actions{display:flex;gap:10px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+  .hint{font-size:12px;color:var(--dim);margin-top:6px}
+  .toast{position:fixed;right:22px;bottom:22px;background:#1d2130;border:1px solid var(--line);
+    border-radius:8px;padding:10px 16px;font-size:13px;opacity:0;transition:.25s;pointer-events:none}
+  .toast.show{opacity:1}
+  @media(max-width:820px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>CHARACTERS</h1>
+  <span class="sub" id="hdr">铁谷 · 角色库</span>
+  <span class="grow"></span>
+  <a class="btn" href="/">去玩 →</a>
+</header>
+
+<main>
+  <aside>
+    <h2>角色</h2>
+    <div id="list"></div>
+    <button id="new" style="width:100%;margin-top:6px">＋ 新建角色</button>
+    <button class="ghost" id="presets" style="width:100%;margin-top:8px">导入预设小队</button>
+  </aside>
+
+  <section>
+    <div class="grid">
+      <div class="field">
+        <label>名字</label>
+        <input id="name" placeholder="角色的名字">
+      </div>
+      <div class="field">
+        <label>职业（来自世界包）</label>
+        <select id="profession"></select>
+      </div>
+
+      <div class="field full">
+        <label>背景描述</label>
+        <textarea id="description"></textarea>
+      </div>
+      <div class="field full">
+        <label>人格 / 说话方式</label>
+        <textarea id="personality"></textarea>
+      </div>
+
+      <div class="field full">
+        <label>私有目标（只有他自己知道）</label>
+        <input id="private_goal">
+      </div>
+      <div class="field">
+        <label>恐惧</label>
+        <input id="fear">
+      </div>
+      <div class="field">
+        <label>底线</label>
+        <input id="bottom_line">
+      </div>
+
+      <div class="field full">
+        <label>属性（3~18）</label>
+        <div class="statrow" id="stats"></div>
+      </div>
+
+      <div class="field">
+        <label>HP 上限</label>
+        <input id="hp_max" type="number" min="1" max="50">
+      </div>
+      <div class="field">
+        <label>理智上限</label>
+        <input id="sanity_max" type="number" min="1" max="50">
+      </div>
+
+      <div class="field">
+        <label>模型供应商</label>
+        <select id="provider">
+          <option value="">跟随全局</option>
+          <option value="minimax">minimax</option>
+          <option value="deepseek">deepseek</option>
+          <option value="qwen">qwen</option>
+          <option value="ollama">ollama</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>模型名</label>
+        <input id="model" placeholder="留空=跟随全局">
+      </div>
+
+      <div class="field">
+        <label>思考深度</label>
+        <select id="reasoning_effort">
+          <option value="">跟随全局</option>
+          <option value="low">low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>技能（JSON，可留空）</label>
+        <input id="skills" placeholder='{"撬锁":3}'>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="save">保存</button>
+      <button class="danger" id="del">删除</button>
+      <span class="hint" id="status"></span>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let currentId = null;
+let professionPool = [];
+
+const toast = (msg) => {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+};
+
+async function loadProfessions() {
+  const r = await fetch("/api/worlds/ironvale/professions");
+  const data = await r.json();
+  professionPool = data.professions;
+  $("profession").innerHTML = professionPool
+    .map(p => `<option value="${p.id}">${p.label || p.id}（${p.id}）</option>`)
+    .join("");
+}
+
+function renderStats(stats) {
+  const keys = ["str", "dex", "int", "wis", "cha"];
+  $("stats").innerHTML = keys.map(k => `
+    <div class="f">
+      <label>${k.toUpperCase()}</label>
+      <input class="stat" data-k="${k}" type="number" min="3" max="18"
+             value="${stats && stats[k] !== undefined ? stats[k] : 10}">
+    </div>`).join("");
+}
+
+function fillForm(card) {
+  const d = card.data || {};
+  const e = (d.extensions && d.extensions.ai_trpg) || {};
+  $("name").value = d.name || "";
+  $("profession").value = e.profession || (professionPool[0] && professionPool[0].id) || "";
+  $("description").value = d.description || "";
+  $("personality").value = d.personality || "";
+  $("private_goal").value = e.private_goal || "";
+  $("fear").value = e.fear || "";
+  $("bottom_line").value = e.bottom_line || "";
+  $("hp_max").value = e.hp_max || 11;
+  $("sanity_max").value = e.sanity_max || 10;
+  $("provider").value = (e.model && e.model.provider) || "";
+  $("model").value = (e.model && e.model.model) || "";
+  $("reasoning_effort").value = (e.model && e.model.reasoning_effort) || "";
+  $("skills").value = e.skills ? JSON.stringify(e.skills) : "";
+  renderStats(e.stats || {});
+  $("status").textContent = currentId ? `id: ${currentId}` : "未保存的新角色";
+}
+
+function collect() {
+  const stats = {};
+  document.querySelectorAll(".stat").forEach(el => {
+    stats[el.dataset.k] = Number(el.value) || 10;
+  });
+  let skills = null;
+  const raw = $("skills").value.trim();
+  if (raw) {
+    try { skills = JSON.parse(raw); } catch (e) { throw new Error("技能不是合法 JSON"); }
+  }
+  return {
+    name: $("name").value.trim(),
+    profession: $("profession").value,
+    description: $("description").value,
+    personality: $("personality").value,
+    private_goal: $("private_goal").value,
+    fear: $("fear").value,
+    bottom_line: $("bottom_line").value,
+    stats,
+    skills,
+    provider: $("provider").value,
+    model: $("model").value.trim(),
+    reasoning_effort: $("reasoning_effort").value,
+    hp_max: Number($("hp_max").value) || 11,
+    sanity_max: Number($("sanity_max").value) || 10,
+  };
+}
+
+async function loadList() {
+  const r = await fetch("/api/characters");
+  const data = await r.json();
+  const list = $("list");
+  if (!data.characters.length) {
+    list.innerHTML = `<div class="hint">还没有角色，点下面「导入预设小队」或新建。</div>`;
+    return;
+  }
+  list.innerHTML = data.characters.map(c => `
+    <div class="item ${c.id === currentId ? "active" : ""}" data-id="${c.id}">
+      <div class="n">${c.name}</div>
+      <div class="m">${c.profession} · ${c.id}</div>
+    </div>`).join("");
+  list.querySelectorAll(".item").forEach(el => {
+    el.addEventListener("click", () => selectCharacter(el.dataset.id));
+  });
+}
+
+async function selectCharacter(id) {
+  const r = await fetch(`/api/characters/${id}`);
+  if (!r.ok) return toast("读取失败");
+  const data = await r.json();
+  currentId = id;
+  fillForm(data.card);
+  loadList();
+}
+
+async function save() {
+  let body;
+  try { body = collect(); } catch (e) { return toast(e.message); }
+  if (!body.name) return toast("名字不能为空");
+
+  const url = currentId ? `/api/characters/${currentId}` : "/api/characters";
+  const method = currentId ? "PUT" : "POST";
+  const r = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) return toast("保存失败：" + (await r.text()).slice(0, 80));
+  const data = await r.json();
+  currentId = data.id;
+  $("status").textContent = `已保存 id: ${currentId}`;
+  toast("已保存");
+  loadList();
+}
+
+async function removeCharacter() {
+  if (!currentId) return toast("先选中一个角色");
+  if (!confirm("确定删除这个角色？")) return;
+  const r = await fetch(`/api/characters/${currentId}`, { method: "DELETE" });
+  if (!r.ok) return toast("删除失败");
+  currentId = null;
+  $("name").value = "";
+  toast("已删除");
+  loadList();
+}
+
+async function newCharacter() {
+  currentId = null;
+  const tpl = professionPool[0] || {};
+  fillForm({
+    data: {
+      name: "",
+      description: tpl.description || "",
+      personality: "",
+      extensions: { ai_trpg: { profession: tpl.id, stats: tpl.stats || {} } },
+    },
+  });
+  $("status").textContent = "未保存的新角色";
+}
+
+async function seedPresets() {
+  const r = await fetch("/api/characters/presets?world=ironvale&players=6", { method: "POST" });
+  if (!r.ok) return toast("导入失败");
+  const data = await r.json();
+  toast(`已导入 ${data.count} 个角色`);
+  loadList();
+}
+
+$("save").addEventListener("click", save);
+$("del").addEventListener("click", removeCharacter);
+$("new").addEventListener("click", newCharacter);
+$("presets").addEventListener("click", seedPresets);
+
+(async () => {
+  await loadProfessions();
+  await newCharacter();
+  await loadList();
+})();
+</script>
+</body>
+</html>

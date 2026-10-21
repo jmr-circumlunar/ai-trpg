@@ -59,10 +59,18 @@ PROFESSION_TEMPLATES: dict[str, dict] = {
 PROFESSIONS = list(PROFESSION_TEMPLATES)
 
 
+def templates_from_pack(pack) -> dict[str, dict]:
+    """优先用世界包的职业定义；没有则回落到内置模板。"""
+    if pack is None or not getattr(pack, "professions", None):
+        return dict(PROFESSION_TEMPLATES)
+    return {str(p.get("id")): p for p in pack.professions}
+
+
 def new_card(
     *,
     name: str,
     profession: str = "盗贼",
+    pack=None,
     description: str | None = None,
     personality: str | None = None,
     private_goal: str | None = None,
@@ -79,7 +87,8 @@ def new_card(
     sanity_max: int = 10,
     equipment: list | None = None,
 ) -> CharacterCard:
-    tpl = PROFESSION_TEMPLATES.get(profession) or PROFESSION_TEMPLATES["盗贼"]
+    pool = templates_from_pack(pack)
+    tpl = pool.get(profession) or PROFESSION_TEMPLATES["盗贼"]
     final_stats = dict(DEFAULT_STATS)
     final_stats.update(tpl.get("stats") or {})
     if stats:
@@ -125,13 +134,17 @@ def new_card(
     )
 
 
-def preset_cards(players: int) -> dict[str, CharacterCard]:
-    """按职业轮转生成预设小队（一期默认队伍，页面可再编辑）。"""
+def preset_cards(players: int, pack=None) -> dict[str, CharacterCard]:
+    """按世界包的职业池轮转生成预设小队（页面可再编辑）。"""
+    pool = [str(p.get("id")) for p in (pack.profession_pool() if pack else [])]
+    if not pool:
+        pool = PROFESSIONS
+
     cards: dict[str, CharacterCard] = {}
     for i in range(players):
-        profession = PROFESSIONS[i % len(PROFESSIONS)]
+        profession = pool[i % len(pool)]
         cid = f"chr_p{i + 1}"
         cards[cid] = new_card(
-            name=f"角色{i + 1}（{profession}）", profession=profession
+            name=f"角色{i + 1}（{profession}）", profession=profession, pack=pack
         )
     return cards

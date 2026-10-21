@@ -46,6 +46,8 @@ class WorldPack:
     seeds: list[dict] = field(default_factory=list)
     items: list[dict] = field(default_factory=list)
     npcs: list[dict] = field(default_factory=list)
+    professions: list[dict] = field(default_factory=list)
+    initial_pool: list[str] = field(default_factory=list)
     root: Path | None = None
 
     # ── 查询 ────────────────────────────────────────────────
@@ -70,6 +72,19 @@ class WorldPack:
                 continue
             out.append(seed)
         return out
+
+    def profession(self, pid: str) -> dict | None:
+        for item in self.professions:
+            if str(item.get("id")) == pid:
+                return item
+        return None
+
+    def profession_pool(self) -> list[dict]:
+        """一期：按 initial_pool 顺序返回可选职业（没有则全部）。"""
+        if not self.initial_pool:
+            return list(self.professions)
+        picked = [self.profession(p) for p in self.initial_pool]
+        return [p for p in picked if p]
 
     def starter_region(self, origin_regions: list[str]) -> str:
         """开局点 = 角色出身地的交集（有内容者优先），否则用默认 region。"""
@@ -139,6 +154,9 @@ def load_world(world_id: str, root: Path | str) -> WorldPack:
     seeds = (_read_yaml(base / "seeds.yaml", {}) or {}).get("seeds") or []
     items = (_read_yaml(base / "items.yaml", {}) or {}).get("items") or []
     npcs = (_read_yaml(base / "npcs.yaml", {}) or {}).get("npcs") or []
+    prof_doc = _read_yaml(base / "professions.yaml", {}) or {}
+    professions = prof_doc.get("professions") or []
+    initial_pool = [str(x) for x in (prof_doc.get("initial_pool") or [])]
 
     default_era = meta.get("default_era") or next(iter(eras))
     if default_era not in eras:
@@ -158,6 +176,8 @@ def load_world(world_id: str, root: Path | str) -> WorldPack:
         seeds=seeds,
         items=items,
         npcs=npcs,
+        professions=professions,
+        initial_pool=initial_pool,
         root=base,
     )
 

@@ -68,6 +68,15 @@ CREATE TABLE IF NOT EXISTS character_events (
 CREATE INDEX IF NOT EXISTS idx_char_events
     ON character_events (session_id, char_id, turn);
 
+CREATE TABLE IF NOT EXISTS characters (
+    id           TEXT PRIMARY KEY,
+    name         TEXT,
+    profession   TEXT,
+    card_json    TEXT,
+    created_at   TEXT,
+    updated_at   TEXT
+);
+
 CREATE TABLE IF NOT EXISTS session_cards (
     session_id   TEXT,
     char_id      TEXT,

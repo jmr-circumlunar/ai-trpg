@@ -5,38 +5,15 @@ from __future__ import annotations
 import uuid
 from pathlib import Path
 
+from .characters import preset_cards
 from .llm import AgentLLM, LLMConfig, MockLLM
 from .models import CharacterRuntime, GameState, Party, Scene, WorldRef
 from .rules.loader import Rules
-from .testing import make_card
 from .world import WorldPack
 
-PROFESSIONS = ["盗贼", "战士", "学者", "医师", "斥候", "术士"]
-
-# 目标互相冲突，AI 才不会全员配合
-PERSONAS = {
-    "盗贼": ("港区的撬锁人，左手少了两指", "话少、不信人、对货物有执念", "找回被行会没收的妹妹遗物"),
-    "战士": ("退役的夜巡老兵，右耳听不见", "直、护短、不肯认错", "查清三年前那场火灾是谁下的令"),
-    "学者": ("替教会抄书的年轻人，眼睛不好", "好奇、迂腐、记性极好", "读到禁书区最里面那一本"),
-    "医师": ("走街的游医，箱子比人还重", "温和、怕血、嘴上不饶人", "找到消失了两年的师父"),
-    "斥候": ("给商队带路的外乡人", "警觉、爱开玩笑、随时准备跑", "攒够钱离开这座城"),
-    "术士": ("被同行称作骗子的符术师", "浮夸、精于算计、真有点本事", "证明自己不是骗子"),
-}
-
-
-def build_cards(players: int) -> dict:
-    cards = {}
-    for i in range(players):
-        cid = f"chr_p{i + 1}"
-        profession = PROFESSIONS[i % len(PROFESSIONS)]
-        card = make_card(profession=profession)
-        desc, persona, goal = PERSONAS[profession]
-        card.data.name = f"角色{i + 1}（{profession}）"
-        card.data.description = desc
-        card.data.personality = persona
-        card.ext.private_goal = goal
-        cards[cid] = card
-    return cards
+def build_cards(players: int, pack=None) -> dict:
+    """预设小队：职业来自世界包（没有则用内置模板）。"""
+    return preset_cards(players, pack=pack)
 
 
 def build_state(pack: WorldPack, cards: dict, era: str | None = None) -> GameState:
