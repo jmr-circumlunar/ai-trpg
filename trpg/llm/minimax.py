@@ -89,6 +89,8 @@ class MiniMaxClient:
             "retry": 0,
             "net_retry": 0,
         }
+        # None = 还没试过；False = 服务端不支持，不再尝试
+        self._json_mode: bool | None = None
         self._recent_public: list[str] = []
         self._last_error: str = ""
 
@@ -123,7 +125,21 @@ class MiniMaxClient:
             "temperature": self.temperature,
             "max_tokens": max_tokens,
         }
-        data = self._post(payload)
+        if self._json_mode is not False:
+            payload["response_format"] = {"type": "json_object"}
+
+        try:
+            data = self._post(payload)
+            if payload.get("response_format"):
+                self._json_mode = True
+        except HttpError as exc:
+            # 服务端不支持 response_format 时自动降级，只试一次
+            if payload.get("response_format") and exc.status in (400, 404, 422):
+                self._json_mode = False
+                payload.pop("response_format", None)
+                data = self._post(payload)
+            else:
+                raise
 
         base_resp = data.get("base_resp") or {}
         code = base_resp.get("status_code", 0)
@@ -143,6 +159,13 @@ class MiniMaxClient:
         self.usage["calls"] += 1
         self.usage["in"] += int(usage.get("prompt_tokens") or usage.get("total_tokens") or 0)
         self.usage["out"] += int(usage.get("completion_tokens") or 0)
+
+        # 推理模型的 thinking 也吃 max_tokens：被截断时放大预算重来一次
+        finish = (choices[0].get("finish_reason") if choices else None)
+        if finish == "length" and max_tokens < 4000:
+            self.usage["net_retry"] += 1
+            return self._chat(messages, model, int(max_tokens * 1.6))
+
         return content
 
     def _chat_json(
@@ -178,7 +201,7 @@ class MiniMaxClient:
                 prompts.gm_system(self.world_name, state.world.era, self.style, self.taboos),
                 prompts.gm_scene_user(state, self.cards, turn),
                 self.model,
-                max_tokens=700,
+                max_tokens=1200,
             )
             narration = str(data.get("narration") or "").strip()
             if not narration:
@@ -206,7 +229,7 @@ class MiniMaxClient:
                     state, self.cards, action.action, result.outcome, dice_line, turn, label
                 ),
                 self.model,
-                max_tokens=900,
+                max_tokens=1600,
             )
             narration = str(data.get("narration") or "").strip()
             if not narration:
@@ -245,7 +268,7 @@ class MiniMaxClient:
                 prompts.pc_system(card, self.skills),
                 prompts.pc_user(state, card, self._recent_public, turn),
                 self.model_player,
-                max_tokens=900,
+                max_tokens=1200,
             )
             return PlayerAction(
                 actor_id=actor_id,
@@ -278,7 +301,7 @@ class MiniMaxClient:
                 "你把游戏记录压缩成事件摘要，只输出 JSON。",
                 prompts.chronicler_user(turn, text),
                 self.model,
-                max_tokens=400,
+                max_tokens=700,
             )
         except Exception:
             self.usage["fail"] += 1
