@@ -26,15 +26,27 @@ def test_default_timeline_is_first_available(pack):
     assert pack.default_timeline == "academy_year1"
 
 
-def test_senior_students_leave_after_year1(pack):
+def test_grade_gap_matches_canon(pack):
+    """学院按年份分级：恺撒 2007（高两级）、楚子航/诺诺 2008（高一级）、玩家 2009。"""
     y1 = {n["id"] for n in pack.npcs_for("academy_year1")}
     y2 = {n["id"] for n in pack.npcs_for("academy_year2")}
+    y3 = {n["id"] for n in pack.npcs_for("academy_year3")}
 
-    assert "npc_caesar" in y1, "恺撒第一年应在校"
-    assert "npc_caesar" not in y2, "第二年应已毕业"
-    assert "npc_chu" not in y2, "楚子航第二年应已毕业"
-    # 芬格尔留级，多待一年
-    assert "npc_fingel" in y2
+    # 恺撒高两级：第一年在，第二年毕业
+    assert "npc_caesar" in y1
+    assert "npc_caesar" not in y2
+
+    # 楚子航、诺诺高一级：第二年仍在，第三年毕业
+    assert "npc_chu" in y2
+    assert "npc_chu" not in y3
+    assert "npc_nono" in y2
+
+    # 芬格尔留级，一直在
+    assert "npc_fingel" in y3
+
+    # 伊莎贝尔低一级：第一年不在，第二年在
+    assert "npc_isabel" not in y1
+    assert "npc_isabel" in y2
 
 
 def test_peers_enter_in_year1(pack):
