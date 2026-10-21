@@ -51,7 +51,56 @@ class WorldPack:
     # 分层：core 常驻 prompt；archive 进向量库按需检索
     core_text: str = ""
     archive_docs: list[dict] = field(default_factory=list)
+    # 时间线：时间点列表 + NPC 时间窗口
+    timeline: list[dict] = field(default_factory=list)
+    default_timeline: str = ""
+    _timeline_order: dict[str, int] = field(default_factory=dict, repr=False)
+    _windows: dict[str, dict] = field(default_factory=dict, repr=False)
     root: Path | None = None
+
+    def npcs_for(self, timeline_id: str) -> list[dict]:
+        """只返回当前时间点可遇的 NPC。
+
+        `enters` 之前不可遇，`leaves` 之后不可遇（含边界）。
+        """
+        if not timeline_id or not self._timeline_order:
+            return list(self.npcs)
+
+        order = self._timeline_order
+        current = order.get(timeline_id)
+        if current is None:
+            return list(self.npcs)
+
+        out = []
+        for npc in self.npcs:
+            window = self._windows.get(str(npc.get("id"))) or {}
+            enters = str(window.get("enters") or "before")
+            leaves = window.get("leaves")
+
+            if enters != "before":
+                start = order.get(enters)
+                if start is None or start > current:
+                    continue
+            if leaves:
+                end = order.get(str(leaves))
+                if end is not None and current >= end:
+                    continue
+            out.append(npc)
+        return out
+
+    def organizations_text(self) -> str:
+        """势力名单（一句话 + 态度），常驻 prompt —— 细节才去 archive 检索。"""
+        if not self.organizations:
+            return ""
+        lines = []
+        for oid, cfg in self.organizations.items():
+            cfg = cfg or {}
+            label = cfg.get("label", oid)
+            attitude = cfg.get("attitude_to_player", 0)
+            resources = "、".join(cfg.get("resources") or [])
+            tail = f"（可提供：{resources}）" if resources else ""
+            lines.append(f"- {label}：对玩家态度 {attitude:+d}{tail}")
+        return "\n".join(lines)
 
     def region_text(self, region: str) -> str:
         """当前区域的详情（进入才注入）。"""
@@ -170,6 +219,29 @@ def load_world(world_id: str, root: Path | str) -> WorldPack:
     professions = prof_doc.get("professions") or []
     initial_pool = [str(x) for x in (prof_doc.get("initial_pool") or [])]
 
+    # 时间线：时间点与该时间点的 NPC 窗口
+    tl_doc = _read_yaml(base / "timeline.yaml", {}) or {}
+    timeline = list(tl_doc.get("timeline") or [])
+    timeline_order = {
+        str(t.get("id")): int(t.get("order", i + 1))
+        for i, t in enumerate(timeline)
+        if t.get("id")
+    }
+    default_timeline = next(
+        (str(t["id"]) for t in timeline if t.get("available")), 
+        str(timeline[0]["id"]) if timeline else "",
+    )
+
+    tw_doc = _read_yaml(base / "npcs_timeline.yaml", {}) or {}
+    tw_defaults = tw_doc.get("defaults") or {}
+    windows: dict[str, dict] = {}
+    for nid, cfg in (tw_doc.get("windows") or {}).items():
+        cfg = dict(cfg or {})
+        kind = cfg.pop("kind", None)
+        merged = dict(tw_defaults.get(kind) or {}) if kind else {}
+        merged.update(cfg)
+        windows[str(nid)] = merged
+
     # core：常驻设定（几条 md 顺序拼接，控制总量）
     core_parts: list[str] = []
     core_dir = base / "core"
@@ -217,6 +289,10 @@ def load_world(world_id: str, root: Path | str) -> WorldPack:
         initial_pool=initial_pool,
         core_text=core_text,
         archive_docs=archive_docs,
+        timeline=timeline,
+        default_timeline=default_timeline,
+        _timeline_order=timeline_order,
+        _windows=windows,
         root=base,
     )
 

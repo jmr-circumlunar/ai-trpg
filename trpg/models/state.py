@@ -12,6 +12,7 @@ class WorldRef(BaseModel):
 
     world_id: str
     era: str
+    timeline: str = ""  # 时间点 id（如 academy_year1）；空 = 用世界默认
 
 
 class Clock(BaseModel):

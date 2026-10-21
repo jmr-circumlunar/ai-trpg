@@ -21,7 +21,11 @@ def build_state(pack: WorldPack, cards: dict, era: str | None = None) -> GameSta
     region = pack.starter_region(origins)
     return GameState(
         session_id=f"ses_{uuid.uuid4().hex[:6]}",
-        world=WorldRef(world_id=pack.world_id, era=era or pack.default_era),
+        world=WorldRef(
+            world_id=pack.world_id,
+            era=era or pack.default_era,
+            timeline=pack.default_timeline,
+        ),
         scene=Scene(
             location_id=f"loc_{region}",
             region=region,
@@ -113,4 +117,6 @@ def build_llm(
         seeds=pack.seeds,
         seed=seed,
         world_core=pack.core_text,
+        world_orgs=pack.organizations_text(),
+        pack=pack,
     )

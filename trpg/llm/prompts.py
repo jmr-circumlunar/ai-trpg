@@ -65,6 +65,7 @@ def gm_system(
     style: str,
     taboos: list[str],
     world_core: str = "",
+    world_orgs: str = "",
 ) -> str:
     taboo_text = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(taboos)) or "（无）"
     return f"""你是「{world_name}」这个 {era} 世界的主持人（GM）。
@@ -79,6 +80,9 @@ def gm_system(
 
 # 世界设定（常驻，不可违背）
 {world_core or "（本世界暂无 core 设定）"}
+
+# 势力（态度 -5 敌对 ~ +5 友好；细节需要时查）
+{world_orgs or "（本世界暂无势力数据）"}
 
 # 基调
 {style}

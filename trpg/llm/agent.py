@@ -56,6 +56,8 @@ class AgentLLM:
         seed: str | int = 0,
         memory: MemorySettings | None = None,
         world_core: str = "",
+        world_orgs: str = "",
+        pack=None,
     ) -> None:
         self.config = config
         self.cards = cards
@@ -71,6 +73,8 @@ class AgentLLM:
         self._last_recall = None
         self.memory = memory or MemorySettings.load(getattr(config, "root", "."))
         self.world_core = world_core
+        self.world_orgs = world_orgs
+        self.pack = pack
         self.seeds = list(seeds or [])
         self.seed_rng = random.Random(f"{seed}:seeds")
         self._used_seeds: set[str] = set()
@@ -150,6 +154,7 @@ class AgentLLM:
             self.style,
             self.taboos,
             self.world_core,
+            self.world_orgs,
         )
 
     def _phase_label(self, state: GameState) -> str:
@@ -191,11 +196,21 @@ class AgentLLM:
         return result.texts(limit=6)
 
     # ── GM ──────────────────────────────────────────────────
-    def _validate_npcs(self, raw) -> list[dict]:
-        """GM 申报的 NPC 必须在 npcs.yaml 里，最多 2 个。"""
-        if not isinstance(raw, list) or not self.npcs:
+    def _available_npcs(self, state: GameState) -> list[dict]:
+        """当前时间点可遇的 NPC（毕业/未入学的自动排除）。"""
+        if self.pack is not None:
+            try:
+                return self.pack.npcs_for(state.world.timeline)
+            except Exception:  # noqa: BLE001
+                pass
+        return list(self.npcs)
+
+    def _validate_npcs(self, raw, state: GameState | None = None) -> list[dict]:
+        """GM 申报的 NPC 必须在当前时间点可遇，最多 2 个。"""
+        pool = self._available_npcs(state) if state is not None else list(self.npcs)
+        if not isinstance(raw, list) or not pool:
             return []
-        by_id = {str(n.get("id")): n for n in self.npcs if n.get("id")}
+        by_id = {str(n.get("id")): n for n in pool if n.get("id")}
         out, seen = [], set()
         for item in raw:
             nid = str(item)
@@ -237,7 +252,7 @@ class AgentLLM:
                     self.cards,
                     turn,
                     self._phase_label(state),
-                    self.npcs,
+                    self._available_npcs(state),
                     seed_hint,
                 ),
                 self.default_spec,
@@ -250,7 +265,7 @@ class AgentLLM:
             return {
                 "narration": narration,
                 "hooks": data.get("hooks") or [],
-                "present_npcs": self._validate_npcs(data.get("present_npcs")),
+                "present_npcs": self._validate_npcs(data.get("present_npcs"), state),
             }
         except Exception as exc:
             self.usage["fail"] += 1
