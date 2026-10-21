@@ -113,7 +113,12 @@ class MockLLM:
 
     # ── PC ──────────────────────────────────────────────────
     def player_action(
-        self, actor_id: str, card: CharacterCard, state: GameState, turn: int
+        self,
+        actor_id: str,
+        card: CharacterCard,
+        state: GameState,
+        turn: int,
+        previous: list[str] | None = None,
     ) -> PlayerAction:
         rng = self._actor_rng(actor_id, turn)
         skill = rng.choice(_SKILLS)

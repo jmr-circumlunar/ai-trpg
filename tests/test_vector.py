@@ -116,14 +116,27 @@ def test_recall_respects_limit():
 
 # ── 召回日志 ─────────────────────────────────────────────
 class Echo:
+    """第一步调 recall，第二步 final。"""
+
     kind = "echo"
 
+    def __init__(self) -> None:
+        self.calls = 0
+
     def chat(self, messages, model, temperature=0.9, max_tokens=1200, extra_override=None):
+        self.calls += 1
+        if self.calls == 1:
+            payload = {"type": "tool", "tool": "recall", "args": {"query": "钟楼 铁栅"}}
+        else:
+            payload = {
+                "type": "final",
+                "thought": "想",
+                "action": "做",
+                "skill": "观察",
+                "intent": "normal",
+            }
         return ChatResult(
-            content=json.dumps(
-                {"thought": "想", "action": "做", "skill": "观察", "intent": "normal"},
-                ensure_ascii=False,
-            ),
+            content=json.dumps(payload, ensure_ascii=False),
             usage={"prompt_tokens": 1, "completion_tokens": 1},
         )
 
@@ -139,7 +152,8 @@ def test_recall_log_written():
     agent = AgentLLM(cfg, cards, events=events, vectors=vectors)
     agent.player_action("chr_a", cards["chr_a"], make_state(), 3)
 
-    assert agent.recall_log
+    assert agent.recall_log, "调了 recall 就应有日志"
     entry = agent.recall_log[-1]
     assert entry["char_id"] == "chr_a"
     assert "items" in entry and "debug" in entry
+    assert entry["debug"].get("vector_hits") is not None

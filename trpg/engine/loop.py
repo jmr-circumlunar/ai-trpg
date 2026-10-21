@@ -99,21 +99,25 @@ class GameLoop:
             )
             rec.npc_moves = npc_moves
 
-        # ⚡ DECLARE：所有玩家同时思考（最耗时的一段）
+        # DECLARE + RESOLVE：按 dex 顺序逐个思考并结算
+        # 后者能看到前者「做了什么、结果如何」——这是跑团的核心，值得用时间换
         declare_started = time.perf_counter()
-        actions = await asyncio.gather(
-            *[
-                asyncio.to_thread(self.llm.player_action, cid, card, self.state, t)
-                for cid, card in actors
-            ]
-        )
+        ordered = self._order_by_dex(actors)
+        actions: list = []
+        results: list = []
+        briefs: list[str] = []
+        for cid, card in ordered:
+            action = await asyncio.to_thread(
+                self.llm.player_action, cid, card, self.state, t, list(briefs)
+            )
+            result = judge(action, card, self.state, self.rules, self.dice)
+            actions.append(action)
+            results.append(result)
+            briefs.append(
+                f"{card.name} {action.skill or '行动'}·{result.outcome}：{action.action[:30]}"
+            )
         rec.declare_ms = int((time.perf_counter() - declare_started) * 1000)
-
-        # RESOLVE：串行掷骰（共享 RNG，保证可复现）
-        results = [
-            judge(action, card, self.state, self.rules, self.dice)
-            for (cid, card), action in zip(actors, actions)
-        ]
+        actors = ordered
 
         # NARRATE：合并成一次 GM 调用（串行 N 次是最大瓶颈）
         out = await asyncio.to_thread(
@@ -232,6 +236,13 @@ class GameLoop:
                 )
             except Exception:  # noqa: BLE001
                 pass  # embedding 失败不影响主流程
+
+    def _order_by_dex(self, actors: list[tuple[str, CharacterCard]]) -> list[tuple[str, CharacterCard]]:
+        """先手由 dex 决定；平手按 chr_id 保证可复现。"""
+        return sorted(
+            actors,
+            key=lambda item: (-item[1].ext.stats.get("dex", 10), item[0]),
+        )
 
     def _resolve_death(self, cid: str) -> None:
         rt = self.state.characters.get(cid)

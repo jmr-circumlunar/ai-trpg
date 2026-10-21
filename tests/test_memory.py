@@ -98,23 +98,34 @@ def test_event_carries_time_and_location():
 
 # ── 注入 prompt ──────────────────────────────────────────
 class Recorder:
+    """第一步调 recall，第二步 final（模拟 ReAct）。"""
+
     kind = "rec"
 
-    def __init__(self) -> None:
+    def __init__(self, query: str = "撬锁") -> None:
         self.calls: list[list[dict]] = []
+        self.query = query
 
     def chat(self, messages, model, temperature=0.9, max_tokens=1200, extra_override=None):
         self.calls.append(messages)
+        if len(self.calls) == 1:
+            payload = {"type": "tool", "tool": "recall", "args": {"query": self.query}}
+        else:
+            payload = {
+                "type": "final",
+                "thought": "想",
+                "action": "做",
+                "skill": "观察",
+                "intent": "normal",
+            }
         return ChatResult(
-            content=json.dumps(
-                {"thought": "想", "action": "做", "skill": "观察", "intent": "normal"},
-                ensure_ascii=False,
-            ),
+            content=json.dumps(payload, ensure_ascii=False),
             usage={"prompt_tokens": 1, "completion_tokens": 1},
         )
 
 
-def test_recall_injected_into_prompt():
+def test_recall_tool_injects_memory():
+    """回忆不是自动注入的——Agent 调了 recall 才会看到。"""
     cfg = LLMConfig(ROOT)
     cards = {"chr_a": make_card(), "chr_b": make_card(profession="战士")}
     rec = Recorder()
@@ -127,10 +138,40 @@ def test_recall_injected_into_prompt():
     agent = AgentLLM(cfg, cards, events=store)
     agent.player_action("chr_a", cards["chr_a"], make_state(), 2)
 
+    assert len(rec.calls) == 2, "应先调 tool 再 final"
+    second = json.dumps(rec.calls[1], ensure_ascii=False)
+    assert "撬锁·success" in second  # 自己回忆出来的
+    assert "交涉·failure" not in second  # 别人的记忆不会串台
+
+
+def test_no_recall_by_default():
+    """不调 tool 时，prompt 里不应出现任何长记忆（只有近期上下文）。"""
+    cfg = LLMConfig(ROOT)
+    cards = {"chr_a": make_card()}
+    rec = Recorder()
+    cfg._adapters = {"minimax": rec}
+    store = EventStore()
+    store.add(ev("chr_a", 1, "很久以前的事：撬锁成功", 8))
+
+    agent = AgentLLM(cfg, cards, events=store)
+    # 直接返回 final（不调 tool）
+    rec.query = ""
+    agent._tool_call = lambda *a, **k: []  # 不会走到这里
+    rec.chat = lambda messages, model, temperature=0.9, max_tokens=1200, extra_override=None: (
+        rec.calls.append(messages)
+        or ChatResult(
+            content=json.dumps(
+                {"type": "final", "thought": "想", "action": "做", "skill": "观察"},
+                ensure_ascii=False,
+            ),
+            usage={"prompt_tokens": 1, "completion_tokens": 1},
+        )
+    )
+    agent.player_action("chr_a", cards["chr_a"], make_state(), 2)
+
+    assert len(rec.calls) == 1
     prompt = json.dumps(rec.calls[0], ensure_ascii=False)
-    assert "你的记忆" in prompt
-    assert "撬锁·success" in prompt  # 自己的记忆在
-    assert "交涉·failure" not in prompt  # 别人的记忆不在
+    assert "很久以前的事" not in prompt
 
 
 def test_no_events_degrades_gracefully():

@@ -159,6 +159,28 @@ state_delta 只能使用以下路径，且必须符合类型：
  "state_delta": {{"turn": {turn}, "changes": [{{"path": "tension", "op": "add", "value": 3}}]}}}}"""
 
 
+AGENT_PROTOCOL = """# 你可以调用工具，也可以直接提交行动
+每次只输出一个 JSON 对象：
+
+- 提交行动（**绝大多数情况直接用它**）
+  {{"type": "final", "thought": "…", "action": "…", "approach": "…", "skill": "潜行", "target": null, "intent": "normal"}}
+
+- 检索自己的记忆（**默认不要用**；只在需要回忆 3 回合以前的事、确认旧道具、接续旧剧情线时才调）
+  {{"type": "tool", "tool": "recall", "args": {{"query": "钟楼 铁栅"}}}}
+
+- 观察场景细节
+  {{"type": "tool", "tool": "look", "args": {{"focus": "巷口"}}}}
+
+- 看自己的状态
+  {{"type": "tool", "tool": "check_self", "args": {{}}}}
+
+# 纪律
+- 最多 3 步；正常情况**第一步就 final**。
+- 最近几回合发生的事你本来就记得（在上下文里），不需要 recall。
+- 想做一件事但缺信息时，才调 look 或 recall。
+"""
+
+
 def pc_system(card: CharacterCard, skills: list[str], eras: str = "") -> str:
     ext = card.ext
     examples = (card.data.mes_example or "").strip()[:600]
@@ -184,6 +206,8 @@ def pc_system(card: CharacterCard, skills: list[str], eras: str = "") -> str:
 - **你必须主动推进自己的目标**：整回合只做「观察」「等待」是浪费。没有更好的办法时，就制造一个机会。
 - **thought 必须是中文**，且是角色的内心话（第一人称、口语、可带偏见），不是旁白也不是推理稿。≤ 40 字。
 - 篇幅：thought ≤ 40 字，action ≤ 60 字，approach ≤ 20 字。**JSON 字符串内不要换行**（用空格代替），否则会被截断。
+
+{AGENT_PROTOCOL}
 {eras}"""
 
 
@@ -194,28 +218,33 @@ def pc_user(
     turn: int,
     memories: list[str] | None = None,
     chapter: list[str] | None = None,
+    previous: list[str] | None = None,
 ) -> str:
     ext = card.ext
     hp_max = ext.hp_max
     inv = "、".join(e.name_flavor or e.template_id for e in ext.equipment) or "空手"
-    recent = "\n".join(f"- {x}" for x in public_recent[-2:]) or "（故事刚开始）"
-    memory_block = (
-        "\n".join(f"- {m}" for m in memories)
-        if memories
-        else "（你还什么都没经历）"
-    )
+    recent = "\n".join(f"- {x}" for x in public_recent[-3:]) or "（故事刚开始）"
     chapter_block = (
         "\n".join(f"- {c}" for c in chapter) if chapter else "（还没有更早的回顾）"
     )
+    # 短期记忆分层：近 3 回合原文常驻，更早靠摘要；具体长记忆要调 recall
+    memory_block = ""
+    if memories:
+        memory_block = "\n# 你临时想起的事（刚调过 recall）\n" + "\n".join(
+            f"- {m}" for m in memories
+        )
+    previous_block = ""
+    if previous:
+        previous_block = "\n# 本回合已经发生（排在你前面的队友）\n" + "\n".join(
+            f"- {x}" for x in previous
+        )
 
     return f"""# 更早发生了什么（分章回顾）
 {chapter_block}
 
-# 你知道的（最近两回合公开叙述）
+# 最近几回合（你亲身经历，完全记得）
 {recent}
-
-# 你的记忆（只有你知道，别人不知道）
-{memory_block}
+{previous_block}{memory_block}
 
 # 你的状态
 HP {ext.hp}/{hp_max}　理智 {ext.sanity}/{ext.sanity_max}　装备：{inv}

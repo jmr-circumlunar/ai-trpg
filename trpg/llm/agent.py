@@ -336,56 +336,148 @@ class AgentLLM:
             }
 
     # ── PC（按角色卡解析 provider/model）────────────────────
-    def player_action(
-        self, actor_id: str, card: CharacterCard, state: GameState, turn: int
+    # ── 玩家 Agent：ReAct（思考 → 调 tool / 提交行动）─────────
+    MAX_STEPS = 3
+
+    def _tool_call(
+        self, actor_id: str, card: CharacterCard, state: GameState, tool: str,
+        args: dict, turn: int,
+    ):
+        if tool == "recall":
+            query = str(args.get("query") or "").strip()
+            result = hybrid_recall(query, actor_id, self.events, self.vectors)
+            self.recall_log.append(
+                {
+                    "turn": turn,
+                    "char_id": actor_id,
+                    "query": query[:80],
+                    "debug": result.debug,
+                    "items": [
+                        {"source": i.source, "score": round(i.score, 4), "text": i.text[:60]}
+                        for i in result.items
+                    ],
+                }
+            )
+            self.recall_log = self.recall_log[-50:]
+            return result.texts(limit=5)
+
+        if tool == "look":
+            focus = str(args.get("focus") or "四周")
+            parts = []
+            if state.scene.description:
+                parts.append(state.scene.description)
+            if state.scene.present_npcs:
+                parts.append("在场：" + "、".join(state.scene.present_npcs))
+            if state.scene.exits:
+                parts.append("出口：" + "、".join(e.to for e in state.scene.exits))
+            return f"{focus} —— " + "；".join(parts) if parts else f"{focus}：没有更多细节"
+
+        if tool == "check_self":
+            ext = card.ext
+            inv = "、".join(e.name_flavor or e.template_id for e in ext.equipment) or "空手"
+            return (
+                f"HP {ext.hp}/{ext.hp_max}，理智 {ext.sanity}/{ext.sanity_max}，"
+                f"装备：{inv}，职业：{ext.profession}"
+            )
+
+        return f"没有这个工具：{tool}"
+
+    def _to_action(self, actor_id: str, data: dict) -> PlayerAction:
+        raw_intent = str(data.get("intent") or "normal").strip().lower()
+        try:
+            intent = Intent(raw_intent)
+        except ValueError:
+            intent = Intent.normal
+        return PlayerAction(
+            actor_id=actor_id,
+            thought=str(data.get("thought") or ""),
+            action=str(data.get("action") or "").strip() or "按兵不动",
+            approach=str(data.get("approach") or ""),
+            skill=data.get("skill") or None,
+            target=data.get("target") or None,
+            intent=intent,
+        )
+
+    def run_agent_turn(
+        self,
+        actor_id: str,
+        card: CharacterCard,
+        state: GameState,
+        turn: int,
+        previous: list[str] | None = None,
     ) -> PlayerAction:
+        """一个 Agent 的完整回合：思考 → 调 tool → 再思考 → 提交行动。
+
+        短期记忆（近 3 回合）直接在上下文里；长期记忆只能通过 recall 主动取。
+        正常情况第一步就 final，不需要任何工具。
+        """
         spec = self.config.resolve(
             card_model=card.ext.model,
             provider=self._override_provider,
             model=self._override_model,
             reasoning_effort=self._override_effort,
         )
-        try:
-            data = self._chat_json(
-                prompts.pc_system(card, self.skills),
-                prompts.pc_user(
-                    state,
-                    card,
-                    self._recent_public,
-                    turn,
-                    self._recall(actor_id, turn),
-                    self._summaries,
-                ),
-                spec,
-                "player",
-            )
-            # 模型可能给出表外值（如 investigate），一律降级为 normal，不让整条行动作废
-            raw_intent = str(data.get("intent") or "normal").strip().lower()
-            try:
-                intent = Intent(raw_intent)
-            except ValueError:
-                intent = Intent.normal
+        system = prompts.pc_system(card, self.skills)
+        scratch: list[str] = []
+        recalled: list[str] = []
 
-            return PlayerAction(
-                actor_id=actor_id,
-                thought=str(data.get("thought") or ""),
-                action=str(data.get("action") or "").strip() or "按兵不动",
-                approach=str(data.get("approach") or ""),
-                skill=data.get("skill") or None,
-                target=data.get("target") or None,
-                intent=intent,
+        for step in range(self.MAX_STEPS):
+            user = prompts.pc_user(
+                state,
+                card,
+                self._recent_public,
+                turn,
+                recalled or None,
+                self._summaries,
+                previous,
             )
-        except Exception as exc:
-            self.usage["fail"] += 1
-            self._last_error = f"player_action[{spec.provider}/{spec.model}]: {exc}"
-            return PlayerAction(
-                actor_id=actor_id,
-                thought="（判断失误，先拖时间）",
-                action="保持戒备，扫视四周的出口",
-                approach="贴着墙，不抢先动",
-                skill="观察",
-                intent=Intent.careful,
-            )
+            if scratch:
+                user += "\n\n# 你已经查到的\n" + "\n".join(f"- {x}" for x in scratch)
+
+            try:
+                data = self._chat_json(system, user, spec, "player")
+            except Exception as exc:  # noqa: BLE001
+                self.usage["fail"] += 1
+                self._last_error = f"agent_turn[{spec.provider}/{spec.model}]: {exc}"
+                return self._fallback_action(actor_id)
+
+            kind = str(data.get("type") or "").strip().lower()
+            if kind == "tool":
+                tool = str(data.get("tool") or "")
+                args = data.get("args") or {}
+                result = self._tool_call(actor_id, card, state, tool, args, turn)
+                if tool == "recall":
+                    recalled = result if isinstance(result, list) else []
+                    scratch.append(f"recall({args.get('query', '')}) → 回忆起 {len(recalled)} 条")
+                else:
+                    scratch.append(f"{tool} → {result}")
+                continue
+
+            return self._to_action(actor_id, data)
+
+        # 步数用尽：用最后一次判断兜底
+        return self._fallback_action(actor_id)
+
+    def _fallback_action(self, actor_id: str) -> PlayerAction:
+        return PlayerAction(
+            actor_id=actor_id,
+            thought="（判断失误，先拖时间）",
+            action="保持戒备，扫视四周的出口",
+            approach="贴着墙，不抢先动",
+            skill="观察",
+            intent=Intent.careful,
+        )
+
+    def player_action(
+        self,
+        actor_id: str,
+        card: CharacterCard,
+        state: GameState,
+        turn: int,
+        previous: list[str] | None = None,
+    ) -> PlayerAction:
+        """兼容入口（loop / mock 协议同名）。"""
+        return self.run_agent_turn(actor_id, card, state, turn, previous)
 
     # ── NPC（独立 Agent）────────────────────────────────────
     def npc_action(self, npc: dict, state: GameState, turn: int) -> dict:

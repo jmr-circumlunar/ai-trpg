@@ -123,7 +123,11 @@ def apply_delta(
             _set(new, ch.path, ch.value)
         elif ch.op == DeltaOp.add:
             if isinstance(cur, list):
-                _set(new, ch.path, [*cur, ch.value])
+                # GM 常把单值写成数组（[["exposed"]] 的坑），这里统一摊平
+                if isinstance(ch.value, list):
+                    _set(new, ch.path, [*cur, *ch.value])
+                else:
+                    _set(new, ch.path, [*cur, ch.value])
             else:
                 _set(new, ch.path, (cur or 0) + ch.value)
         elif ch.op == DeltaOp.sub:
