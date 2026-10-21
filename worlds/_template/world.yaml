@@ -1,0 +1,42 @@
+# 世界包模板：复制本目录为 worlds/<world_id>/ 后填写
+schema_version: 1
+
+world_id: example
+name: 示例世界
+
+# 基调：直接进 GM prompt
+tone: |
+  一句话说清这个世界的核心张力（力量与代价同源？秩序与自由？）
+
+# 风格开关（进 GM 配置）
+style: 黑暗
+dc_strictness: normal          # loose | normal | strict
+taboos:                        # 硬禁忌，GM 不得引入
+  - 不涉及现实政治与真实人物
+  - 不做任何性内容
+  - 不写针对未成年人的暴力细节
+
+# 时间切片：每局选一个；era 决定可用 tag、装备谱系、事件种子范围
+eras:
+  era_one:
+    label: 初始时代
+    tech_level: medieval
+    tier_max: 3
+
+# 地域：不预设数量，开局点由角色 origin_region 并集决定
+regions:
+  region_one:
+    label: 起始地
+    locations: 15
+
+# 组织：原著向 + 自建都可登记
+organizations:
+  org_example:
+    label: 示例组织
+    attitude_to_player: 0        # -5 ~ +5
+    resources: [情报, 通行]
+
+# 默认配置
+defaults:
+  world_start_stage: 1
+  tension_start: 30

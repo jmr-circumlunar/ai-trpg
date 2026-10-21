@@ -1,0 +1,10 @@
+schema_version: 1
+
+# starter_kit 引用 items.yaml 的模板 id；bonus_tag 用于随机采样时的偏好
+professions:
+  战士: {starter_kit: [tpl_iron_sword, tpl_leather_armor], bonus_tag: blade,    budget_bonus: 0}
+  盗贼: {starter_kit: [tpl_dagger, tpl_lockpick],        bonus_tag: lockpick, budget_bonus: 0}
+  学者: {starter_kit: [tpl_notebook, tpl_lantern],       bonus_tag: document, budget_bonus: 2}
+  医师: {starter_kit: [tpl_medkit, tpl_dagger],          bonus_tag: heal,     budget_bonus: 2}
+  斥候: {starter_kit: [tpl_shortbow, tpl_cloak],         bonus_tag: stealth,  budget_bonus: 0}
+  术士: {starter_kit: [tpl_focus, tpl_robe],             bonus_tag: arcane,   budget_bonus: -2}

@@ -1,0 +1,22 @@
+.venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.idea/
+.vscode/
+
+# SQLite（含向量与 trace，不进仓库）
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# 版权世界包不进公开仓库（见知识库 03-世界包/00-索引 第三节）
+worlds/longzu/
+worlds/*/characters/*.json
+!worlds/_template/**
+!worlds/_shared/**

@@ -1,0 +1,54 @@
+schema_version: 1
+
+attributes: [str, dex, int, wis, cha]
+attr_mod_formula: "(attr - 10) // 2"
+
+# 行动类型 -> 基础 DC（routine 不判定）
+dc_base:
+  routine: 0
+  risky: 10
+  contest: 12
+  professional: 15
+  extreme: 18
+  absurd: 22
+
+# 仅用于 DC
+stage_mod: {1: 0, 2: 1, 3: 2, 4: 3}
+intent_mod: {careful: -1, normal: 0, all_in: 1}
+situation_delta_cap: 2
+
+# 四档判定
+dice:
+  sides: 20
+  crit: 20
+  crit_margin: 10
+  fail_forward_floor: -2
+
+skill_attr:
+  潜行: dex
+  观察: wis
+  交涉: cha
+  威吓: cha
+  攀爬: str
+  医疗: int
+  追踪: wis
+  学识: int
+  生存: wis
+  器械: int
+  撬锁: dex
+  意志: wis
+
+# 技能 -> 行动类型（决定 base DC）
+skill_action_type:
+  潜行: contest
+  观察: contest
+  交涉: contest
+  威吓: contest
+  攀爬: contest
+  意志: contest
+  撬锁: professional
+  医疗: professional
+  追踪: professional
+  器械: professional
+  学识: professional
+  生存: risky
