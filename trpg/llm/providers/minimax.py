@@ -20,8 +20,9 @@ class MiniMaxAdapter(OpenAICompatAdapter):
         api_key: str = "",
         timeout: float = 90.0,
         on_retry=None,
+        extra: dict | None = None,
     ) -> None:
-        super().__init__(base_url, endpoint, api_key, timeout, on_retry)
+        super().__init__(base_url, endpoint, api_key, timeout, on_retry, extra)
 
     def _check_business_error(self, data: dict) -> None:
         base_resp = data.get("base_resp") or {}

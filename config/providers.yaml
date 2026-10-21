@@ -13,6 +13,10 @@ providers:
     endpoint: /text/chatcompletion_v2
     api_key_env: MINIMAX_API_KEY
     timeout: 90
+    # 推理模型默认思考过长（单次 30s+）；low 档实测质量不变、耗时显著下降。
+    # 注意：不要用 thinking.type=disabled——MiniMax 不支持，会返回空内容。
+    extra:
+      reasoning_effort: low
 
   deepseek:
     kind: openai

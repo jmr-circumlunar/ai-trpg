@@ -68,6 +68,7 @@ class LLMConfig:
             api_key=self.api_key(provider),
             timeout=float(cfg.get("timeout", 90)),
             on_retry=self._on_retry,
+            extra=cfg.get("extra") or {},
         )
         self._adapters[provider] = adapter
         return adapter

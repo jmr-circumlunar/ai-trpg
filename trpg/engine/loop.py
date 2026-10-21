@@ -1,12 +1,18 @@
-"""回合状态机（S0 手写版）。
+"""回合状态机（S1：玩家思考阶段并行）。
 
-S1 会平移成 LangGraph 的 StateGraph——因此每个阶段都是一个独立方法，
+每回合的实际耗时结构：
+    SCENE(1 次 LLM) + DECLARE(N 次 LLM，可并行) + NARRATE(N 次 LLM，串行)
+并行后：总耗时 ≈ 1 + 1 + N 次调用，而不是 1 + N + N。
+
+S2 会把它平移成 LangGraph 的 StateGraph——每个阶段都是一个独立方法，
 迁移时基本是机械替换。
 """
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
+import time
 from dataclasses import dataclass, field
 
 from ..models import CharacterCard, DeltaChange, GameState, StateDelta
@@ -27,6 +33,8 @@ class TurnRecord:
     narration: list[str] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)
     version: int = 0
+    elapsed_ms: int = 0
+    declare_ms: int = 0
 
 
 class GameLoop:
@@ -46,39 +54,68 @@ class GameLoop:
         self.dice = DiceEngine(seed)
         self.conn = conn
         self.seed = seed
+        self.next_turn = 1
 
     # ── 主循环 ──────────────────────────────────────────────
-    def run(self, turns: int) -> list[TurnRecord]:
+    async def run(self, turns: int) -> list[TurnRecord]:
         records: list[TurnRecord] = []
-
-        for t in range(1, turns + 1):
-            scene = self.llm.describe_scene(self.state, t)
-            rec = TurnRecord(turn=t, scene=scene.get("narration", ""))
-
-            for cid, card in self._active_actors():
-                action = self.llm.player_action(cid, card, self.state, t)
-                result = judge(action, card, self.state, self.rules, self.dice)
-                out = self.llm.narrate(self.state, action, result, t)
-
-                rec.actors.append(cid)
-                rec.outcomes.append(f"{result.outcome} ({result.total} vs {result.dc})")
-                rec.narration.append(out.get("narration", ""))
-
-                delta = out.get("state_delta")
-                if delta is not None:
-                    try:
-                        self.state = apply_delta(self.state, delta, self.cards)
-                    except DeltaValidationError as exc:
-                        rec.rejected.append(f"{cid}: {'; '.join(exc.errors[:2])}")
-
-                self._persist(t, cid, action, result, out, scene)
-                self._resolve_death(cid)
-
-            self._maybe_advance_stage(t)
-            rec.version = self.state.version
-            records.append(rec)
-
+        for _ in range(turns):
+            records.append(await self.step())
         return records
+
+    async def step(self, turn: int | None = None) -> TurnRecord:
+        """推进一个回合。API 层按需单步调用，CLI 用 run() 批量。"""
+        t = turn if turn is not None else self.next_turn
+        self.next_turn = t + 1
+        started = time.perf_counter()
+
+        scene = await asyncio.to_thread(self.llm.describe_scene, self.state, t)
+        rec = TurnRecord(turn=t, scene=scene.get("narration", ""))
+
+        actors = self._active_actors()
+
+        # ⚡ DECLARE：所有玩家同时思考（最耗时的一段）
+        declare_started = time.perf_counter()
+        actions = await asyncio.gather(
+            *[
+                asyncio.to_thread(self.llm.player_action, cid, card, self.state, t)
+                for cid, card in actors
+            ]
+        )
+        rec.declare_ms = int((time.perf_counter() - declare_started) * 1000)
+
+        # RESOLVE：串行掷骰（共享 RNG，保证可复现）
+        results = [
+            judge(action, card, self.state, self.rules, self.dice)
+            for (cid, card), action in zip(actors, actions)
+        ]
+
+        # NARRATE：合并成一次 GM 调用（串行 N 次是最大瓶颈）
+        out = await asyncio.to_thread(
+            self.llm.narrate_batch, self.state, actions, results, t
+        )
+        narrations: dict[str, str] = out.get("narrations") or {}
+
+        # COMMIT：整回合的 delta 一次合并
+        delta = out.get("state_delta")
+        if delta is not None:
+            try:
+                self.state = apply_delta(self.state, delta, self.cards)
+            except DeltaValidationError as exc:
+                rec.rejected.append("; ".join(exc.errors[:3]))
+
+        for (cid, card), action, result in zip(actors, actions, results):
+            rec.actors.append(cid)
+            rec.outcomes.append(f"{result.outcome} ({result.total} vs {result.dc})")
+            text = narrations.get(cid, "")
+            rec.narration.append(text)
+            self._persist(t, cid, action, result, {"narration": text}, scene)
+            self._resolve_death(cid)
+
+        self._maybe_advance_stage(t)
+        rec.version = self.state.version
+        rec.elapsed_ms = int((time.perf_counter() - started) * 1000)
+        return rec
 
     # ── 各阶段 ──────────────────────────────────────────────
     def _active_actors(self) -> list[tuple[str, CharacterCard]]:

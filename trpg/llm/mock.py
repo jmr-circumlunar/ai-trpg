@@ -24,7 +24,22 @@ class MockLLM:
     model = "mock"
 
     def __init__(self, seed: int | str) -> None:
-        self._rng = random.Random(f"{seed}:mock")
+        self.seed = str(seed)
+        self._rng = random.Random(f"{self.seed}:mock")  # 场景/叙事用（串行调用，安全）
+        self._actor_rngs: dict[tuple[str, int], random.Random] = {}
+
+    def _actor_rng(self, actor_id: str, turn: int) -> random.Random:
+        """每个 (actor, turn) 一个独立 RNG。
+
+        玩家阶段是并行的，如果共用 `_rng`，线程交错会让随机序列取决于调度顺序，
+        同 seed 也复现不了。按 actor 派生后，结果与并行顺序无关。
+        """
+        key = (actor_id, turn)
+        rng = self._actor_rngs.get(key)
+        if rng is None:
+            rng = random.Random(f"{self.seed}:{actor_id}:{turn}")
+            self._actor_rngs[key] = rng
+        return rng
 
     # ── GM ──────────────────────────────────────────────────
     def describe_scene(self, state: GameState, turn: int) -> dict:
@@ -33,27 +48,34 @@ class MockLLM:
             "hooks": [self._rng.choice(["有人刚离开", "门没锁", "地上有拖痕"])],
         }
 
-    def narrate(
+    def narrate_batch(
         self,
         state: GameState,
-        action: PlayerAction,
-        result,
+        actions: list[PlayerAction],
+        results: list,
         turn: int,
     ) -> dict:
-        text = (
-            f"{action.actor_id} 尝试{action.action}（{result.outcome}）："
-            f"骰面 {result.rolls} 合计 {result.total} 对 DC {result.dc}。"
-        )
-
+        narrations: dict[str, str] = {}
         changes: list[dict] = []
-        if result.outcome in ("failure", "fail_forward") and self._rng.random() < 0.6:
-            changes.append(
-                {
-                    "path": f"characters.{action.actor_id}.hp",
-                    "op": DeltaOp.sub,
-                    "value": 1,
-                }
+
+        for action, result in zip(actions, results):
+            narrations[action.actor_id] = (
+                f"{action.actor_id} 尝试{action.action}（{result.outcome}）："
+                f"骰面 {result.rolls} 合计 {result.total} 对 DC {result.dc}。"
             )
+            if result.outcome in ("failure", "fail_forward") and self._rng.random() < 0.6:
+                changes.append(
+                    {
+                        "path": f"characters.{action.actor_id}.hp",
+                        "op": DeltaOp.sub,
+                        "value": 1,
+                    }
+                )
+            if result.outcome == "crit_success":
+                changes.append(
+                    {"path": "party.flags", "op": DeltaOp.add, "value": f"clue_t{turn}"}
+                )
+
         if self._rng.random() < 0.5:
             if state.tension > 85:
                 step = -4
@@ -62,17 +84,9 @@ class MockLLM:
             else:
                 step = self._rng.choice([-3, 2, 4])
             changes.append({"path": "tension", "op": DeltaOp.add, "value": step})
-        if result.outcome == "crit_success":
-            changes.append(
-                {
-                    "path": "party.flags",
-                    "op": DeltaOp.add,
-                    "value": f"clue_t{turn}",
-                }
-            )
 
         return {
-            "narration": text,
+            "narrations": narrations,
             "narration_meta": {"beat": "rising" if state.tension < 60 else "climax"},
             "state_delta": StateDelta(
                 turn=turn,
@@ -84,14 +98,15 @@ class MockLLM:
     def player_action(
         self, actor_id: str, card: CharacterCard, state: GameState, turn: int
     ) -> PlayerAction:
-        skill = self._rng.choice(_SKILLS)
+        rng = self._actor_rng(actor_id, turn)
+        skill = rng.choice(_SKILLS)
         return PlayerAction(
             actor_id=actor_id,
             thought=f"（{card.name} 的私下盘算）先看看再说。",
             action=f"用 {skill} 试探前面的情况",
             approach="贴着墙，压低呼吸",
             skill=skill,
-            intent=self._rng.choice([Intent.careful, Intent.normal, Intent.all_in]),
+            intent=rng.choice([Intent.careful, Intent.normal, Intent.all_in]),
         )
 
     # ── 编年史 ──────────────────────────────────────────────

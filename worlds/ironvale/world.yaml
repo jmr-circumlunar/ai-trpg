@@ -1,0 +1,42 @@
+schema_version: 1
+
+world_id: ironvale
+name: 铁谷
+
+# 一句话说清核心张力（直接进 GM prompt）
+tone: |
+  钟声停下之后，这座港城开始有人消失。
+  没人承认见过那口钟被敲响，但每个人都在数剩下的日子。
+
+style: 冷峻、克制，少形容词，多用具体的物与动作
+
+default_era: medieval
+default_region: north_port
+
+taboos:
+  - 不涉及现实政治与真实人物
+  - 不做任何性内容
+  - 不写针对未成年人的暴力细节
+  - 不复述任何已有作品的情节
+
+organizations:
+  faction_guild:
+    label: 港务行会
+    attitude_to_player: 0
+    resources: [货物, 通行, 账册]
+  faction_church:
+    label: 灰钟教会
+    attitude_to_player: -1
+    resources: [情报, 禁书, 钟楼]
+  faction_watch:
+    label: 夜巡队
+    attitude_to_player: 1
+    resources: [巡逻, 牢房, 通缉令]
+
+regions:
+  north_port:
+    label: 北港
+    locations: 8
+  old_quarter:
+    label: 旧城
+    locations: 7

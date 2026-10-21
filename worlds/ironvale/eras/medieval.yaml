@@ -1,0 +1,33 @@
+id: medieval
+label: 铁与钟
+tech_level: medieval
+# 该时代允许出现的最高装备档（内容准备范围，不参与掉落限制）
+tier_max: 3
+
+# 该时代存在的东西（era 管合法性，不管强度）
+allowed_tags:
+  - blade
+  - blunt
+  - polearm
+  - ranged
+  - armor
+  - shield
+  - light
+  - heavy
+  - climb
+  - lockpick
+  - light_source
+  - heal
+  - fire
+  - stealth
+  - disguise
+  - document
+  - tool
+  - container
+  - consumable
+  - arcane
+
+forbidden:
+  - 火器
+  - 电子设备
+  - 现代交通工具

@@ -20,6 +20,7 @@ class OpenAICompatAdapter:
         api_key: str = "",
         timeout: float = 90.0,
         on_retry: Callable | None = None,
+        extra: dict | None = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
@@ -28,6 +29,8 @@ class OpenAICompatAdapter:
         self.timeout = timeout
         self._on_retry = on_retry
         self._json_mode: bool | None = None
+        # 供应商特有参数（如 reasoning_effort），由 providers.yaml 配置
+        self.extra = extra or {}
 
     # ── 可被子类覆盖的三个钩子 ───────────────────────────────
     def _headers(self) -> dict[str, str]:
@@ -44,6 +47,8 @@ class OpenAICompatAdapter:
         }
         if self._json_mode is not False:
             payload["response_format"] = {"type": "json_object"}
+        if self.extra:
+            payload.update(self.extra)
         return payload
 
     def _check_business_error(self, data: dict) -> None:

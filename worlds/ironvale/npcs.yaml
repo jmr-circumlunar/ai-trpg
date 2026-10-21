@@ -1,0 +1,43 @@
+schema_version: 1
+
+# NPC 模板：每个都要有目标 + 秘密 + 立场，否则只是背景板
+npcs:
+  - id: npc_bellringer
+    name: 敲钟人
+    org: faction_church
+    goal: 让钟再响一次
+    secret: 他知道钟响意味着什么，但不敢说
+    attitude: -1
+    tags: [守口如瓶, 敬畏]
+
+  - id: npc_guild_clerk
+    name: 账房书记
+    org: faction_guild
+    goal: 把第二账册藏到没人找得到的地方
+    secret: 账册上有他自己的名字
+    attitude: 0
+    tags: [谨慎, 怕事]
+
+  - id: npc_watch_captain
+    name: 夜巡队长
+    org: faction_watch
+    goal: 在月底前抓住"那个东西"
+    secret: 她见过一次，回来后再也不敢走夜路
+    attitude: 1
+    tags: [硬, 不信邪]
+
+  - id: npc_fishwife
+    name: 鱼市老妇
+    org: ""
+    goal: 等一个人回来
+    secret: 每天多留的那份鱼是给失踪者的
+    attitude: 1
+    tags: [话多, 记性好]
+
+  - id: npc_pictureless
+    name: 无画像的人
+    org: ""
+    goal: 抹掉通缉令上关于自己的一切
+    secret: 他既不是人，也不是龙
+    attitude: -2
+    tags: [沉默, 不合常理]

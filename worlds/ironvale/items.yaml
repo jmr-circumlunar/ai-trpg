@@ -1,0 +1,84 @@
+schema_version: 1
+
+# 装备模板：数值区间由 tier 决定，实际值在区间内 roll，再乘成色倍率
+# attrs 的 key 与角色属性/判定字段对应（atk / def / ward）
+items:
+  - id: tpl_dagger
+    name: 短匕
+    slot: weapon
+    tier: 1
+    req_level: 1
+    attrs: {atk: [1, 2]}
+    tags: [blade, light]
+
+  - id: tpl_iron_sword
+    name: 制式铁剑
+    slot: weapon
+    tier: 2
+    req_level: 2
+    attrs: {atk: [2, 4]}
+    tags: [blade, heavy]
+
+  - id: tpl_shortbow
+    name: 短弓
+    slot: weapon
+    tier: 2
+    req_level: 2
+    attrs: {atk: [2, 3]}
+    tags: [ranged, light]
+
+  - id: tpl_boarding_pike
+    name: 登船长矛
+    slot: weapon
+    tier: 3
+    req_level: 4
+    attrs: {atk: [5, 7]}
+    tags: [polearm, heavy]
+
+  - id: tpl_leather_armor
+    name: 浸油皮甲
+    slot: armor
+    tier: 2
+    req_level: 2
+    attrs: {def: [2, 3]}
+    tags: [armor, light]
+
+  - id: tpl_cloak
+    name: 缆绳工罩衣
+    slot: armor
+    tier: 1
+    req_level: 1
+    attrs: {def: [1, 2]}
+    tags: [armor, stealth]
+
+  - id: tpl_lantern
+    name: 铁架提灯
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {ward: [0, 1]}
+    tags: [light_source]
+
+  - id: tpl_lockpick
+    name: 撬锁铁片
+    slot: tool
+    tier: 1
+    req_level: 1
+    attrs: {ward: [1, 2]}
+    tags: [lockpick, tool]
+
+  - id: tpl_medkit
+    name: 游医药匣
+    slot: consumable
+    tier: 2
+    req_level: 1
+    attrs: {ward: [1, 2]}
+    tags: [heal, consumable]
+
+  - id: tpl_charm_ward
+    name: 灰钟护符
+    slot: trinket
+    tier: 3
+    req_level: 3
+    attrs: {ward: [2, 3]}
+    tags: [arcane]

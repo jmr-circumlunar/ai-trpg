@@ -15,7 +15,7 @@ from .config import LLMConfig, ModelSpec
 from .providers import extract_json
 
 # 各任务的输出预算下限（角色卡没指定 max_tokens 时用）
-TASK_TOKENS = {"scene": 1200, "narrate": 1600, "player": 1200, "summary": 700}
+TASK_TOKENS = {"scene": 1200, "narrate": 2600, "player": 1200, "summary": 700}
 
 DEFAULT_SKILLS = [
     "潜行", "观察", "交涉", "威吓", "攀爬", "医疗",
@@ -48,6 +48,9 @@ class AgentLLM:
         self.style = style
         self.world_name = world_name
         self.default_spec: ModelSpec = config.resolve(provider=provider, model=model)
+        # CLI 覆盖：临时实验开关，优先级高于角色卡
+        self._override_provider = provider
+        self._override_model = model
 
         self.usage: dict[str, Any] = {
             "calls": 0,
@@ -125,25 +128,50 @@ class AgentLLM:
             self._recent_public.append(fallback)
             return {"narration": fallback, "hooks": []}
 
-    def narrate(self, state: GameState, action: PlayerAction, result, turn: int) -> dict:
-        dice_line = (
-            f"{result.expr} 骰面 {result.rolls} → 合计 {result.total} vs DC {result.dc}"
-            f"（差 {result.margin:+d}）"
-        )
-        card = self.cards.get(action.actor_id)
-        label = card.name if card else action.actor_id
+    def narrate_batch(
+        self,
+        state: GameState,
+        actions: list[PlayerAction],
+        results: list,
+        turn: int,
+    ) -> dict:
+        """一次调用处理本回合全部玩家的后果叙事。
+
+        串行调 N 次 narrate 是 S1 调试时发现的最大瓶颈（4 人 1 回合 ≈ 98s），
+        合并后每回合只剩 1 次场景 + 1 次并行思考 + 1 次合并叙事。
+        """
+        items = []
+        for action, result in zip(actions, results):
+            card = self.cards.get(action.actor_id)
+            items.append(
+                {
+                    "actor_id": action.actor_id,
+                    "label": card.name if card else action.actor_id,
+                    "action": action.action,
+                    "outcome": result.outcome,
+                    "dice_line": (
+                        f"{result.expr} 骰面 {result.rolls} → 合计 {result.total}"
+                        f" vs DC {result.dc}（差 {result.margin:+d}）"
+                    ),
+                }
+            )
+
         try:
             data = self._chat_json(
                 self._gm_system(state),
-                prompts.gm_narrate_user(
-                    state, self.cards, action.action, result.outcome, dice_line, turn, label
-                ),
+                prompts.gm_narrate_batch_user(state, self.cards, items, turn),
                 self.default_spec,
                 "narrate",
             )
-            narration = str(data.get("narration") or "").strip()
-            if not narration:
-                raise ValueError("narration 为空")
+
+            narrations: dict[str, str] = {}
+            for entry in data.get("narrations") or []:
+                if isinstance(entry, dict) and entry.get("actor_id"):
+                    text = str(entry.get("text") or "").strip()
+                    if text:
+                        narrations[str(entry["actor_id"])] = text
+            if not narrations:
+                raise ValueError("narrations 为空")
 
             delta_payload = data.get("state_delta")
             delta = None
@@ -154,17 +182,23 @@ class AgentLLM:
                 except Exception:
                     delta = None
 
-            self._recent_public.append(narration)
+            for text in narrations.values():
+                self._recent_public.append(text)
+
             return {
-                "narration": narration,
+                "narrations": narrations,
                 "narration_meta": data.get("narration_meta") or {},
                 "state_delta": delta,
             }
         except Exception as exc:
             self.usage["fail"] += 1
-            self._last_error = f"narrate: {exc}"
+            self._last_error = f"narrate_batch: {exc}"
+            fallback = {
+                it["actor_id"]: f"{it['label']} 的尝试有了结果（{it['outcome']}），场面一时僵住。"
+                for it in items
+            }
             return {
-                "narration": f"{label} 的尝试有了结果（{result.outcome}），场面一时僵住。",
+                "narrations": fallback,
                 "narration_meta": {},
                 "state_delta": None,
             }
@@ -173,7 +207,11 @@ class AgentLLM:
     def player_action(
         self, actor_id: str, card: CharacterCard, state: GameState, turn: int
     ) -> PlayerAction:
-        spec = self.config.resolve(card_model=card.ext.model)
+        spec = self.config.resolve(
+            card_model=card.ext.model,
+            provider=self._override_provider,
+            model=self._override_model,
+        )
         try:
             data = self._chat_json(
                 prompts.pc_system(card, self.skills),
@@ -181,6 +219,13 @@ class AgentLLM:
                 spec,
                 "player",
             )
+            # 模型可能给出表外值（如 investigate），一律降级为 normal，不让整条行动作废
+            raw_intent = str(data.get("intent") or "normal").strip().lower()
+            try:
+                intent = Intent(raw_intent)
+            except ValueError:
+                intent = Intent.normal
+
             return PlayerAction(
                 actor_id=actor_id,
                 thought=str(data.get("thought") or ""),
@@ -188,7 +233,7 @@ class AgentLLM:
                 approach=str(data.get("approach") or ""),
                 skill=data.get("skill") or None,
                 target=data.get("target") or None,
-                intent=Intent(str(data.get("intent") or "normal")),
+                intent=intent,
             )
         except Exception as exc:
             self.usage["fail"] += 1

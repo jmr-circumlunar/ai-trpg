@@ -177,6 +177,58 @@ HP {ext.hp}/{hp_max}　理智 {ext.sanity}/{ext.sanity_max}　装备：{inv}
 {{"thought": "…", "action": "…", "approach": "…", "skill": "潜行", "target": null, "intent": "normal"}}"""
 
 
+def gm_narrate_batch_user(
+    state: GameState,
+    cards: dict[str, CharacterCard],
+    items: list[dict],
+    turn: int,
+) -> str:
+    """一次处理本回合所有玩家的行动与判定（避免 N 次串行调用）。"""
+    lines = []
+    for i, it in enumerate(items, 1):
+        lines.append(
+            f"{i}. [{it['actor_id']}] {it['label']}：{it['action']}\n"
+            f"   判定：{it['dice_line']} → 结果 {it['outcome']}"
+        )
+    actions_block = "\n".join(lines)
+
+    return f"""# 硬状态（事实，不可违背）
+{compact_state(state, cards)}
+
+# 本回合全部行动与判定（已定，不可改）
+{actions_block}
+
+结果档位含义：
+- crit_success：达成意图并额外获益（新线索 / 省资源 / 敌方破绽）
+- success：达成意图
+- fail_forward：达成意图，但必须付出代价（HP / 时间 / 暴露 / 失物）
+- failure：未达成，引入后果，但必须留一条出路
+
+# 本回合任务
+narrate_result（第 {turn} 回合）：
+1. 为**每一个** actor 各写 1~3 句后果叙事，按 actor_id 对应；
+2. 各人的叙事要互相呼应（他们同处一地，可能互相看见彼此的结果）；
+3. 最后给出本回合的合并状态变更。
+
+state_delta 只能使用以下路径，且必须符合类型：
+- characters.<id>.hp（整数，0 ~ 上限）
+- characters.<id>.sanity（整数）
+- characters.<id>.conditions（字符串列表，add 追加一个状态词）
+- characters.<id>.inventory（物品 id 列表）
+- characters.<id>.position（只能是 "scene" / "away" / "dead"）
+- party.gold / party.supplies（整数）
+- party.flags（**字符串列表，用 add 追加单个字符串**）
+- party.reputation（{{势力名: 整数}}）
+- tension（整数）、stage（整数）、scene.location_id（已有地点 id）、quests（任务对象列表）
+（不要修改 version / session_id / world）
+约束：单回合 tension 变化不超过 ±10；没有明确的大事时不要扣 HP。
+
+# 输出格式
+{{"narrations": [{{"actor_id": "chr_p1", "text": "…"}}],
+ "narration_meta": {{"beat": "rising"}},
+ "state_delta": {{"turn": {turn}, "changes": [{{"path": "tension", "op": "add", "value": 3}}]}}}}"""
+
+
 def arbiter_user(narration: str, state_text: str) -> str:
     return f"""检查下面的叙事是否与硬状态矛盾，只查 4 条，不管文采：
 1. 是否让已死或已离场的角色行动？

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 跑团 · TRPG</title>
+<style>
+  :root{
+    --bg:#12141a; --panel:#1a1d25; --line:#2a2f3a;
+    --ink:#d8dbe2; --dim:#8b93a3; --gold:#c8a45c; --red:#b5544a; --green:#5f9e6e;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+  }
+  header{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:14px 22px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  header h1{
+    margin:0; font-size:17px; letter-spacing:.14em; font-weight:600; color:var(--gold);
+  }
+  header .sub{color:var(--dim); font-size:12px; letter-spacing:.06em}
+  header .grow{flex:1}
+  select,input{
+    background:#101319; color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:6px 10px; font-size:13px; outline:none;
+  }
+  button{
+    background:var(--gold); color:#1a1206; border:0; border-radius:6px;
+    padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer;
+    letter-spacing:.04em; transition:.15s;
+  }
+  button:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.45; cursor:not-allowed}
+  main{
+    display:grid; grid-template-columns:250px minmax(0,1fr) 230px;
+    gap:18px; padding:18px 22px; align-items:start;
+    max-width:1500px; margin:0 auto;
+  }
+  aside{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px}
+  aside h2{
+    margin:0 0 10px; font-size:12px; letter-spacing:.16em; color:var(--dim);
+    font-weight:600; text-transform:uppercase;
+  }
+  .card{
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:10px;
+    background:#151821;
+  }
+  .card .name{font-size:13px; font-weight:600}
+  .card .meta{font-size:12px; color:var(--dim); margin-top:2px}
+  .bar{height:4px; background:#242938; border-radius:3px; margin-top:7px; overflow:hidden}
+  .bar > i{display:block; height:100%; background:var(--green); transition:width .3s}
+  .bar.san > i{background:#6b7fc4}
+  #log{min-height:60vh; max-height:72vh; overflow-y:auto; padding-right:6px}
+  .turn{border-left:2px solid var(--line); padding:2px 0 2px 16px; margin-bottom:22px}
+  .turn .scene{color:#a9b2c3; font-style:italic; margin-bottom:12px}
+  .turn .hdr{font-size:11px; letter-spacing:.14em; color:var(--dim); margin-bottom:8px}
+  .act{margin-bottom:12px}
+  .act .who{font-size:12px; color:var(--gold)}
+  .badge{
+    display:inline-block; font-size:11px; padding:1px 7px; border-radius:20px;
+    border:1px solid var(--line); margin-left:6px; color:var(--dim);
+  }
+  .badge.success{color:var(--green); border-color:#2f4a37}
+  .badge.crit_success{color:#e2c47a; border-color:#5a4a22}
+  .badge.fail_forward{color:#d08a52; border-color:#5a3f24}
+  .badge.failure{color:var(--red); border-color:#4d2a27}
+  .act p{margin:2px 0 0; color:#c3c9d4}
+  .kv{display:flex; justify-content:space-between; font-size:13px; padding:3px 0}
+  .kv span:last-child{color:var(--gold)}
+  .empty{color:var(--dim); font-size:13px; padding:40px 0; text-align:center}
+  .spin{display:inline-block; width:12px; height:12px; border:2px solid #4a4f5c;
+        border-top-color:var(--gold); border-radius:50%; animation:r .8s linear infinite;
+        vertical-align:-2px; margin-right:6px}
+  @keyframes r{to{transform:rotate(360deg)}}
+  @media(max-width:900px){ main{grid-template-columns:1fr} aside{order:2} }
+</style>
+</head>
+<body>
+<header>
+  <h1>IRONVALE</h1>
+  <span class="sub" id="hdr-sub">未开局</span>
+  <span class="grow"></span>
+  <label class="sub">世界
+    <select id="world"></select>
+  </label>
+  <label class="sub">玩家
+    <select id="players">
+      <option>2</option><option selected>3</option><option>4</option><option>5</option>
+    </select>
+  </label>
+  <label class="sub">模型
+    <select id="provider">
+      <option value="mock">mock（离线）</option>
+      <option value="auto" selected>真实模型</option>
+    </select>
+  </label>
+  <button id="new">开一局</button>
+</header>
+
+<main>
+  <aside>
+    <h2>角色</h2>
+    <div id="chars"><div class="empty">尚未开局</div></div>
+  </aside>
+
+  <section>
+    <div id="log">
+      <div class="empty">点右上角「开一局」开始。<br>每回合：GM 描述场景 → 各角色同时决策 → 骰子判定 → GM 叙事。</div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+      <button id="advance" disabled>推进一回合</button>
+      <span class="sub" id="timing"></span>
+    </div>
+  </section>
+
+  <aside>
+    <h2>世界</h2>
+    <div id="world-info"><div class="empty">—</div></div>
+  </aside>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let sid = null;
+
+const badge = (outcome, raw) => {
+  const tier = (raw || "").split(" ")[0];
+  return `<span class="badge ${tier}">${raw}</span>`;
+};
+
+async function loadWorlds() {
+  const r = await fetch("/api/worlds");
+  const data = await r.json();
+  $("world").innerHTML = data.worlds
+    .map(w => `<option value="${w.id}">${w.name}（${w.counts.seeds} 种子）</option>`)
+    .join("");
+}
+
+async function newSession() {
+  $("new").disabled = true;
+  $("new").textContent = "开局中…";
+  try {
+    const r = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        world: $("world").value,
+        players: Number($("players").value),
+        provider: $("provider").value,
+        seed: "42",
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const s = await r.json();
+    sid = s.session_id;
+    $("log").innerHTML = "";
+    $("advance").disabled = false;
+    $("hdr-sub").textContent = `${s.world.name} · ${s.world.era} · ${s.region} · ${s.session_id}`;
+    renderState(s);
+  } catch (e) {
+    $("log").innerHTML = `<div class="empty" style="color:#b5544a">开局失败：${e.message}</div>`;
+  } finally {
+    $("new").disabled = false;
+    $("new").textContent = "开一局";
+  }
+}
+
+async function advance() {
+  if (!sid) return;
+  const btn = $("advance");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin"></span>GM 正在推演…`;
+  $("timing").textContent = "";
+  try {
+    const r = await fetch(`/api/sessions/${sid}/advance`, { method: "POST" });
+    if (!r.ok) throw new Error(await r.text());
+    const res = await r.json();
+    appendTurn(res);
+    renderState(res.state);
+    $("timing").textContent =
+      `本回合 ${(res.elapsed_ms / 1000).toFixed(1)}s（玩家并行 ${(res.declare_ms / 1000).toFixed(1)}s）`;
+  } catch (e) {
+    $("timing").textContent = "推进失败：" + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "推进一回合";
+  }
+}
+
+function appendTurn(res) {
+  const log = $("log");
+  const div = document.createElement("div");
+  div.className = "turn";
+  const acts = res.actors.map(a => `
+    <div class="act">
+      <div class="who">${a.name}${badge(a.outcome, a.outcome)}</div>
+      <p>${a.narration || "…"}</p>
+    </div>`).join("");
+  div.innerHTML = `
+    <div class="hdr">回合 ${res.turn}</div>
+    <div class="scene">${res.scene}</div>
+    ${acts}
+    ${res.rejected && res.rejected.length
+      ? `<div class="sub" style="color:#b5544a">被拒状态变更：${res.rejected.join(" | ")}</div>` : ""}
+  `;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function renderState(s) {
+  $("chars").innerHTML = s.characters.map(c => {
+    const hpPct = Math.max(0, Math.round(100 * c.hp / c.hp_max));
+    const sanPct = Math.max(0, Math.min(100, c.sanity * 10));
+    return `
+      <div class="card">
+        <div class="name">${c.name}</div>
+        <div class="meta">${c.profession} · HP ${c.hp}/${c.hp_max} · 理智 ${c.sanity}</div>
+        <div class="bar"><i style="width:${hpPct}%"></i></div>
+        <div class="bar san"><i style="width:${sanPct}%"></i></div>
+        ${c.conditions.length ? `<div class="meta">状态：${c.conditions.join("、")}</div>` : ""}
+      </div>`;
+  }).join("");
+
+  $("world-info").innerHTML = `
+    <div class="kv"><span>幕次</span><span>${s.stage}/4</span></div>
+    <div class="kv"><span>张力</span><span>${s.tension}</span></div>
+    <div class="kv"><span>时间</span><span>第 ${s.clock.day} 天 ${String(s.clock.hour).padStart(2, "0")}:00</span></div>
+    <div class="kv"><span>地点</span><span>${s.location}</span></div>
+    <div class="kv"><span>区域</span><span>${s.region}</span></div>
+    <div class="kv"><span>金币/补给</span><span>${s.party.gold} / ${s.party.supplies}</span></div>
+    <div class="kv"><span>状态版本</span><span>v${s.version}</span></div>
+    <div class="kv"><span>已推进</span><span>${s.turns} 回合</span></div>
+  `;
+}
+
+$("new").addEventListener("click", newSession);
+$("advance").addEventListener("click", advance);
+loadWorlds();
+</script>
+</body>
+</html>
