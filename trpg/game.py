@@ -117,4 +117,6 @@ def build_llm(
         events=events,
         npcs=pack.npcs,
         vectors=vectors,
+        seeds=pack.seeds,
+        seed=seed,
     )

@@ -87,13 +87,24 @@ def gm_scene_user(
     turn: int,
     phase_label: str = "",
     npcs: list[dict] | None = None,
+    seed_hint: dict | None = None,
 ) -> str:
     npcs_block = gm_scene_present_npcs_block(npcs or [])
+    seed_block = ""
+    if seed_hint:
+        consequences = " / ".join(seed_hint.get("consequences") or []) or "（无）"
+        seed_block = f"""
+# 本回合可参考的剧情骨架（可参考、可改造、可不用；不要生硬照搬）
+类型：{seed_hint.get('type', '')}
+骨架：{seed_hint.get('skeleton', '')}
+可能的后果：{consequences}
+"""
     return f"""# 硬状态（事实，不可违背）
 {compact_state(state, cards, phase_label=phase_label)}
 
 # 本回合在场 NPC 候选（只能从这里选，最多 2 个）
 {npcs_block}
+{seed_block}
 
 # 本回合任务
 describe_scene（第 {turn} 回合）：写 2~4 句当前场景，给玩家一个可行动的局面。

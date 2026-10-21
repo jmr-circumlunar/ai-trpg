@@ -9,7 +9,9 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -20,10 +22,13 @@ from pydantic import BaseModel, Field
 from ..engine.loop import GameLoop, TurnRecord
 from ..game import build_cards, build_llm, build_memory, build_state
 from ..rules.loader import Rules
+from ..models.memory import CharacterEvent
+from ..storage import db
 from ..storage.memory import EventStore
 from ..world import WorldPackError, discover_worlds, load_world
 
 ROOT = Path(__file__).resolve().parents[2]
+DB_PATH = ROOT / "data" / "trpg.db"
 
 app = FastAPI(title="ai-trpg", version="0.1.0")
 app.state.sessions = {}
@@ -40,6 +45,7 @@ class Session:
     loop: GameLoop
     records: list[TurnRecord] = field(default_factory=list)
     events: Any = None
+    conn: sqlite3.Connection | None = None
 
     @property
     def state(self):
@@ -83,6 +89,13 @@ class CreateSessionReq(BaseModel):
     provider: str = "mock"
     model: str | None = None
     reasoning_effort: str | None = None
+
+
+def _new_conn() -> sqlite3.Connection:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False)
+    db.init_db(conn)
+    return conn
 
 
 def _get(sid: str) -> Session:
@@ -137,8 +150,21 @@ def create_session(req: CreateSessionReq) -> dict:
 
     cards = build_cards(req.players)
     state = build_state(pack, cards, req.era)
-    store = EventStore(None, state.session_id)
-    vectors = build_memory(ROOT, req.provider, None, state.session_id)
+    conn = _new_conn()
+    db.save_session(
+        conn,
+        state.session_id,
+        req.seed,
+        pack.world_id,
+        state.world.era,
+        datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        name=f"{req.provider} 局",
+    )
+    db.save_cards(conn, state.session_id, cards)
+    db.save_state(conn, state)
+
+    store = EventStore(conn, state.session_id)
+    vectors = build_memory(ROOT, req.provider, conn, state.session_id)
     llm = build_llm(
         ROOT,
         rules,
@@ -151,18 +177,73 @@ def create_session(req: CreateSessionReq) -> dict:
         events=store,
         vectors=vectors,
     )
-    loop = GameLoop(rules, cards, state, llm, seed=req.seed, events=store, vectors=vectors)
+    loop = GameLoop(
+        rules, cards, state, llm, seed=req.seed, conn=conn, events=store, vectors=vectors
+    )
 
     session = Session(
-        sid=state.session_id, pack=pack, cards=cards, loop=loop, events=store
+        sid=state.session_id, pack=pack, cards=cards, loop=loop, events=store, conn=conn
     )
     app.state.sessions[session.sid] = session
     return session.snapshot()
 
 
+@app.get("/api/sessions")
+def list_saved_sessions() -> dict:
+    conn = _new_conn()
+    try:
+        return {"sessions": db.list_sessions(conn)}
+    finally:
+        conn.close()
+
+
 @app.get("/api/sessions/{sid}")
 def get_session(sid: str) -> dict:
     return _get(sid).snapshot()
+
+
+@app.post("/api/sessions/{sid}/resume")
+def resume_session(sid: str, provider: str = "mock") -> dict:
+    """从 SQLite 恢复一个旧会话（服务重启后继续玩）。"""
+    existing = app.state.sessions.get(sid)
+    if existing is not None:
+        return existing.snapshot()
+
+    conn = _new_conn()
+    state = db.latest_state(conn, sid)
+    cards = db.load_cards(conn, sid)
+    if state is None or not cards:
+        conn.close()
+        raise HTTPException(404, f"无法恢复会话：{sid}")
+
+    row = conn.execute(
+        "SELECT world_id, era, seed FROM sessions WHERE id = ?", (sid,)
+    ).fetchone()
+    world_id = row[0] if row else state.world.world_id
+    seed = row[2] if row else "42"
+
+    pack = load_world(world_id, ROOT)
+    rules = Rules(ROOT)
+
+    store = EventStore(conn, sid)
+    for item in db.load_events(conn, sid):
+        store.add(CharacterEvent(session_id=sid, **item))
+
+    vectors = build_memory(ROOT, provider, conn, sid)
+    llm = build_llm(
+        ROOT, rules, pack, cards, provider, None, seed, None,
+        events=store, vectors=vectors,
+    )
+    loop = GameLoop(
+        rules, cards, state, llm, seed=seed, conn=conn, events=store, vectors=vectors
+    )
+    loop.next_turn = len(store.all_for(next(iter(cards)))) + 1
+
+    session = Session(
+        sid=sid, pack=pack, cards=cards, loop=loop, events=store, conn=conn
+    )
+    app.state.sessions[sid] = session
+    return session.snapshot()
 
 
 @app.post("/api/sessions/{sid}/advance")
@@ -173,6 +254,11 @@ async def advance(sid: str) -> dict:
         rec = await session.loop.step()
 
     session.records.append(rec)
+    if session.conn is not None:
+        try:
+            db.save_state(session.conn, session.loop.state)
+        except Exception:  # noqa: BLE001
+            pass
     actors = []
     for i, cid in enumerate(rec.actors):
         card = session.cards[cid]

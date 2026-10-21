@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import random
 from typing import Any
 
 from ..models import CharacterCard, GameState, PlayerAction, StateDelta
@@ -50,6 +51,8 @@ class AgentLLM:
         events=None,
         npcs: list[dict] | None = None,
         vectors=None,
+        seeds: list[dict] | None = None,
+        seed: str | int = 0,
     ) -> None:
         self.config = config
         self.cards = cards
@@ -63,6 +66,10 @@ class AgentLLM:
         self.vectors = vectors
         self.recall_log: list[dict] = []  # 每次回忆的记录，供 trace 排查
         self._last_recall = None
+        self.seeds = list(seeds or [])
+        self.seed_rng = random.Random(f"{seed}:seeds")
+        self._used_seeds: set[str] = set()
+        self.seed_log: list[dict] = []
         self.default_spec: ModelSpec = config.resolve(
             provider=provider, model=model, reasoning_effort=reasoning_effort
         )
@@ -188,12 +195,41 @@ class AgentLLM:
                 out.append(by_id[nid])
         return out[:2]
 
+    def _pick_seed(self, state: GameState) -> dict | None:
+        """按 era / 幕次筛可用种子，按权重抽一个，同一局内不重复。"""
+        pool = []
+        for seed in self.seeds:
+            sid = str(seed.get("id") or "")
+            if not sid or sid in self._used_seeds:
+                continue
+            eras = seed.get("era") or []
+            if eras and state.world.era not in eras:
+                continue
+            lo, hi = (seed.get("stage_range") or [1, 4])[:2]
+            if not (lo <= state.stage <= hi):
+                continue
+            pool.append(seed)
+
+        if not pool:
+            return None
+        weights = [float(s.get("weight_base", 1.0) or 1.0) for s in pool]
+        chosen = self.seed_rng.choices(pool, weights=weights)[0]
+        self._used_seeds.add(str(chosen.get("id")))
+        self.seed_log.append({"id": chosen.get("id"), "type": chosen.get("type")})
+        return chosen
+
     def describe_scene(self, state: GameState, turn: int) -> dict:
+        seed_hint = self._pick_seed(state)
         try:
             data = self._chat_json(
                 self._gm_system(state),
                 prompts.gm_scene_user(
-                    state, self.cards, turn, self._phase_label(state), self.npcs
+                    state,
+                    self.cards,
+                    turn,
+                    self._phase_label(state),
+                    self.npcs,
+                    seed_hint,
                 ),
                 self.default_spec,
                 "scene",

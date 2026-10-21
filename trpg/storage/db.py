@@ -68,6 +68,13 @@ CREATE TABLE IF NOT EXISTS character_events (
 CREATE INDEX IF NOT EXISTS idx_char_events
     ON character_events (session_id, char_id, turn);
 
+CREATE TABLE IF NOT EXISTS session_cards (
+    session_id   TEXT,
+    char_id      TEXT,
+    card_json    TEXT,
+    PRIMARY KEY (session_id, char_id)
+);
+
 CREATE TABLE IF NOT EXISTS memory_vectors (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id   TEXT,
@@ -199,3 +206,75 @@ def save_agent_call(
 
 def commit(conn: sqlite3.Connection) -> None:
     conn.commit()
+
+
+# ── 会话恢复 ────────────────────────────────────────────────
+def save_cards(conn: sqlite3.Connection, session_id: str, cards: dict) -> None:
+    for cid, card in cards.items():
+        conn.execute(
+            "INSERT OR REPLACE INTO session_cards (session_id, char_id, card_json) VALUES (?,?,?)",
+            (session_id, cid, card.model_dump_json()),
+        )
+    conn.commit()
+
+
+def load_cards(conn: sqlite3.Connection, session_id: str) -> dict:
+    rows = conn.execute(
+        "SELECT char_id, card_json FROM session_cards WHERE session_id = ?", (session_id,)
+    ).fetchall()
+    from ..models import CharacterCard
+
+    return {cid: CharacterCard.model_validate_json(js) for cid, js in rows}
+
+
+def latest_state(conn: sqlite3.Connection, session_id: str):
+    row = conn.execute(
+        "SELECT state_json FROM world_state WHERE session_id = ? ORDER BY version DESC LIMIT 1",
+        (session_id,),
+    ).fetchone()
+    if not row:
+        return None
+    from ..models import GameState
+
+    return GameState.model_validate_json(row[0])
+
+
+def list_sessions(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        "SELECT s.id, s.name, s.world_id, s.era, s.seed, s.created_at, "
+        "(SELECT COUNT(*) FROM turns t WHERE t.session_id = s.id) AS turns "
+        "FROM sessions s ORDER BY s.created_at DESC"
+    ).fetchall()
+    return [
+        {
+            "session_id": r[0],
+            "name": r[1],
+            "world_id": r[2],
+            "era": r[3],
+            "seed": r[4],
+            "created_at": r[5],
+            "turns": r[6],
+        }
+        for r in rows
+    ]
+
+
+def load_events(conn: sqlite3.Connection, session_id: str) -> list[dict]:
+    rows = conn.execute(
+        "SELECT char_id, turn, world_day, world_hour, kind, summary, entities, importance "
+        "FROM character_events WHERE session_id = ? ORDER BY turn",
+        (session_id,),
+    ).fetchall()
+    return [
+        {
+            "char_id": r[0],
+            "turn": r[1],
+            "day": r[2],
+            "hour": r[3],
+            "kind": r[4],
+            "summary": r[5],
+            "entities": json.loads(r[6] or "[]"),
+            "importance": r[7],
+        }
+        for r in rows
+    ]

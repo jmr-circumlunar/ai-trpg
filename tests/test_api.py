@@ -55,6 +55,36 @@ def test_unknown_session_404():
     assert client.get("/api/sessions/ses_nope").status_code == 404
 
 
+def test_persist_and_resume():
+    """服务重启后能从 SQLite 恢复会话并继续推进。"""
+    r = client.post(
+        "/api/sessions",
+        json={"world": "ironvale", "players": 2, "provider": "mock", "seed": "9"},
+    )
+    sid = r.json()["session_id"]
+    assert client.post(f"/api/sessions/{sid}/advance").status_code == 200
+
+    listed = client.get("/api/sessions").json()["sessions"]
+    assert any(x["session_id"] == sid for x in listed)
+
+    # 模拟重启：清空内存会话
+    from trpg.api.app import app as _app
+
+    _app.state.sessions.pop(sid, None)
+
+    resumed = client.post(f"/api/sessions/{sid}/resume?provider=mock")
+    assert resumed.status_code == 200
+    assert resumed.json()["session_id"] == sid
+
+    nxt = client.post(f"/api/sessions/{sid}/advance")
+    assert nxt.status_code == 200
+    assert nxt.json()["turn"] == 2  # 接着第 2 回合，不是从 1 重来
+
+
+def test_resume_missing_returns_404():
+    assert client.post("/api/sessions/ses_nope/resume").status_code == 404
+
+
 def test_index_page():
     r = client.get("/")
     assert r.status_code == 200
