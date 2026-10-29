@@ -1,0 +1,11 @@
+# 事件种子：狼人杀不需要「事件」，但世界包必须至少有一条种子才能开局（C32）。
+# 这里只给氛围提示，不驱动机制。
+seeds:
+  - id: seed_morning
+    title: 少了一个人
+    summary: 天亮了，广场上少了一个人，没有人承认昨晚出过门。
+    stage_range: [1, 4]
+  - id: seed_silence
+    title: 谁都没说话
+    summary: 整个上午没人开口，屋檐下的水滴声显得格外响。
+    stage_range: [1, 4]

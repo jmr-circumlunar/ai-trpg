@@ -1,0 +1,36 @@
+# 事件文案表（S7-1）：**角色 × 事件** 的措辞放在声明里，不放在代码里。
+#
+# 两层来源，**世界包优先、框架兜底**：
+# - 世界包：`worlds/<id>/prompts/events.yaml`（这个世界的措辞）
+# - 框架层：本文件（通用默认，谁都能用）
+#
+# 每条事件字段：
+# - `id`：事件 id（与 `rules/events.yaml` 的事件声明对应）
+# - `category`：事件类别（中性词）
+# - `roles`：**按角色给文案**（`player` / `npc` 等角色槽位 → 模板文本）
+# - `variables`：模板里用到的变量名（渲染时由调用方填）
+# - `hints`：**情境提醒**（给 GM 看的约束，不是世界语义）
+#
+# 两条硬规则：
+# - **缺省为空**：没有任何文案时什么都不注入 → 现有对局逐字节不变；
+# - **前后端共用一份**：后端注入与前端展示读的都是这张表，杜绝「后端说 A、前端说 B」。
+schema_version: 1
+
+events:
+  - id: evt_stroll_noticed
+    category: discovery
+    roles:
+      player: "你注意到{detail}，但还没想好要不要过去看看。"
+      npc: "{name}朝{detail}的方向瞥了一眼，没有说话。"
+    variables: [detail, name]
+    hints:
+      - "只描述已经成立的事实，不替玩家做决定。"
+
+  - id: evt_someone_nearby
+    category: social
+    roles:
+      player: "不远处传来{detail}的动静。"
+      npc: "{name}似乎注意到了你，但没有立刻动作。"
+    variables: [detail, name]
+    hints:
+      - "给一个可能的人际接触场景，由玩家决定是否搭话。"

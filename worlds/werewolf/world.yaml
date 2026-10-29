@@ -1,0 +1,93 @@
+# 狼人杀 · 村庄之夜（阶段一验收世界包）
+#
+# 这个包**不含一行代码**：昼夜两套流程、私密行动、集体投票、阵营胜负
+# 全部由框架的通用能力 + 本目录的 YAML 组装出来。
+# 若为了跑通它需要改 `trpg/`，说明框架有缺口——回补框架，不在这里打补丁。
+
+schema_version: 1
+world_id: werewolf
+name: 狼人杀 · 村庄之夜
+
+tone: 冷峻、克制
+style: 短句；只写看得见的事，不写心理活动
+
+default_era: base
+default_region: village
+
+taboos:
+  - 不要替玩家决定他做了什么
+  - 不要在任何叙述里泄露未公开的身份与阵营
+  - 不要替代码宣布谁出局（出局由计票与结算决定）
+
+organizations: {}
+
+regions:
+  village:
+    label: 村庄
+    entry: loc_square
+    adjacent: []
+    order: 1
+    authority: ""
+
+calendar:
+  start_date: ""
+
+# 隐藏信息可见性矩阵（C56）：
+#   camp: self_and_camp → 同阵营互认（狼人知道彼此）
+#   profession: self    → 职业只有自己知道
+secrets:
+  camp: self_and_camp
+  profession: self
+
+# 观察者视角（`visibility`）：决定「谁能看到什么」。
+#   thoughts: god —— 参与者之间**互相看不到**思维过程（信息对抗类世界的默认值）
+# 出局（含完成遗言）后自动回到上帝视角，看得到所有人的盘算。
+visibility:
+  thoughts: god
+
+# 人数（方案 35）：狼人杀是固定 8 人板，min=max=8 → 开局界面不能增减号位。
+# 界面按 `default` 铺号位；不再有「人数下拉」。
+players:
+  default: 8
+  min: 8
+  max: 8
+
+# 界面声明（方案 35）：布局选注册骨架，主题取本包 `ui/theme.css`。
+ui:
+  layout: tabletop   # 牌桌俯视：号位围成一圈
+  theme: crimson     # 深红金
+  # 身份牌面图（`ui/cards/<名>.jpg`）：**身份 → 图片**的映射属于世界内容，
+  # 前端是通用层，不该知道「狼人配哪张图」这种世界语义。
+  card_images:
+    狼人: wolf
+    预言家: seer
+    女巫: witch
+    猎人: hunter
+    村民: villager
+
+# 阵营显示名（前端是通用层，不认识 wolf / village 是什么意思）
+camp_labels:
+  wolf: 狼人阵营
+  village: 好人阵营
+
+
+# 死亡原因显示文案（方案 38 / C71）：原因码是内部标识，显示文案是**世界内容**。
+death_labels:
+  consensus_result: 被投票放逐
+  poison: 中毒
+  shoot: 被开枪带走
+  self_destruct: 自爆
+
+# 胜负条件（C58 / A1 / A2）：**屠边**——狼杀光神职、或杀光村民，狼即胜。
+#
+# 为什么不用 camp_eliminated 一条了结：有神职之后，「村民全灭但神还在」不等于
+# 好人阵营全灭，用阵营判会把这种局面误判成「没结束」（收尾计划 §三-A）。
+# 三档任一命中即终局：
+#   ① 狼全灭 → 好人胜
+#   ② 神职（预言家/女巫/猎人）全灭 → 狼胜（屠神）
+#   ③ 村民全灭 → 狼胜（屠民）
+win_condition:
+  any_of:
+    - { kind: camp_eliminated, camp: wolf }
+    - { kind: group_eliminated, group: [预言家, 女巫, 猎人], winner: wolf, label: 神职 }
+    - { kind: group_eliminated, group: [村民], winner: wolf, label: 村民 }

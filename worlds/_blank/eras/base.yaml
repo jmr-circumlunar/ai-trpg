@@ -1,0 +1,7 @@
+# 时代/技术水平：决定装备 tag 池与 tier 上限。
+# allowed_tags 必须 ⊆ rules/equipment.yaml: tag_vocab（C7），留空 = 不限制。
+id: base
+label: 基础时代
+tech_level: medieval
+tier_max: 3
+allowed_tags: []

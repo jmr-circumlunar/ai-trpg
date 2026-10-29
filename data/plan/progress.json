@@ -1,0 +1,705 @@
+{
+  "plan": "39-全域优化执行计划",
+  "plan_doc": "07-AI项目/AI跑团/过程记录/方案/39-全域优化执行计划.md",
+  "created_at": "2026-10-27",
+  "updated_at": "2026-10-29T01:44:16+00:00",
+  "baseline": {
+    "pytest": "919 passed, 6 skipped",
+    "gates": [
+      "check_contract",
+      "check_world",
+      "check_generic",
+      "check_docs --strict",
+      "npm run build"
+    ]
+  },
+  "steps": [
+    {
+      "id": "S0-1",
+      "title": "前端三个 bug 修复",
+      "phase": 0,
+      "depends_on": [],
+      "status": "done",
+      "started_at": "2026-10-27T06:00:29+00:00",
+      "finished_at": "2026-10-27T06:38:36+00:00",
+      "verification": "pytest 927 passed + 6 skipped（基线919+6，只增不减）；check_contract/check_world/check_generic/check_docs --strict 全 0 错 0 警；npm run build 通过；新增 tests/test_s0_frontend_bugs.py 7 条全过；浏览器实测(agent-browser, 8010, ses_b060b0)：复盘链接=/trace?sid=ses_b060b0、推进3回合后#streaming消失且timing=本回合结束、刷新后时间线回填20条(第1-3回合)且空态不出现",
+      "notes": "开工核对：读39号方案S0-1+G9第三节(三bug已定位)；联网查SSE状态复位主流做法(指数退避+jitter/readyState CLOSED降级轮询/finally复位loading,2026-10-27)；读IndexPage.vue、route.js、api.js、play.py、turn.py、trace.py。五项对齐：①分层=仅L6 api新增只读端点+前端src，无跨层import，不改modules.yaml；②契约=不新增状态字段；③零世界词=回填只输出角色名/动作，无世界语义；④数值=回填窗口N进rules/ruleset.yaml(ui.history_turns)，不写死代码；⑤不写死worlds=只读库存表，不写worlds/*",
+      "attempts": 1,
+      "last_error": null
+    },
+    {
+      "id": "S0-2",
+      "title": "牌桌布局抽纯函数 + 座位自动缩放",
+      "phase": 0,
+      "depends_on": [
+        "S0-1"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-27T08:20:12+00:00",
+      "verification": "S0-2 完成（pure layout module + 座位自动缩放），已 finish；本轮预算用尽，S0-3 未开工",
+      "notes": "[reset] 误标纠正：lease release --outcome done 把未开工的 S0-2 标成 done（该步本轮未实现），reset 回 pending 等下一轮正常开工",
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S0-3",
+      "title": "座位插槽清单扩全 + 中心公共区",
+      "phase": 0,
+      "depends_on": [
+        "S0-2"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T08:24:45+00:00",
+      "finished_at": "2026-10-27T09:09:26+00:00",
+      "verification": "S0-3 完成（插槽清单 + 出局折叠 + 归属引导 + 中心公共区），已 finish；本轮预算用尽，S0-4 未开工",
+      "notes": "开工：租约 auto-20261027-1624 取得（fresh）；开工前核对进行中\n开工前核对：①分层=只动前端 L6 呈现层（src/lib、src/components、src/layouts、theme.css），无新增 trpg import，未改 modules.yaml；②五点契约=无新增状态字段，StateDelta/prompt 未动；③零世界词=新代码无狼人/银水等词，check_generic 通过；④数值真相源=无新阈值，缩放仍走 tableLayout.js 与 rules 既有配置；⑤不写 worlds=运行时只读世界上下文（cardUrls），未写 worlds/*。参考：G9 痛点 2/4/5/13、参考01 §A-1/§A-3 槽位形态、联网查 Vue3 named slot+fallback 与 HUD 中心焦点分层",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S0-4",
+      "title": "design token 变量化",
+      "phase": 0,
+      "depends_on": [
+        "S0-3"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-27T10:22:34+00:00",
+      "verification": "S0-4 完成（theme.css 三层 token + 世界包覆盖验证），阶段 0 收官；本轮预算用尽，S1-1 未开工",
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S1-1",
+      "title": "战斗数值进 rules/combat.yaml",
+      "phase": 1,
+      "depends_on": [
+        "S0-4"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T11:23:44+00:00",
+      "finished_at": "2026-10-27T12:43:41+00:00",
+      "verification": "S1-1 完成（战斗数值进 rules/combat.yaml，engine 只读不算，golden 不变），已 finish；本轮预算用尽，S1-2 未开工",
+      "notes": "开工：租约 auto-20261027-1923（fresh）已取得；S0-4 已由上一轮完成（4/29 done）。开工前核对进行中\n开工前核对：①分层=战斗引擎新增 import trpg.rules.loader（M09→M02，M09.depends_on 已含 M02，无需改 modules.yaml；无反向依赖）；②五点契约=战斗结果 dict 的 key 一个没动（kind/actor/target/hit/crit/damage/roll/enemy_hp/killed/note），StateDelta 白名单未动，无新增状态字段；③零世界词=新增 yaml 键名与英文枚举，无银水/悍跳/屠边等世界语义，check_generic 通过；④数值真相源=本步正题：命中集合/伤害骰/伤害下限/暴击倍率/防御减免/威胁档表/幕次加成/夹取区间/标签上限全部进 rules/combat.yaml，engine.py 零数值字面量（新增测试断言）；⑤不写死 worlds=未读写 worlds/*，rules/ 是规则层不是世界包。参考：G-3 自我修正项；联网查 data-driven combat yaml 主流做法（zero-hardcoded 引擎，公式与参数外置到 YAML）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S1-2",
+      "title": "骰型注册表",
+      "phase": 1,
+      "depends_on": [
+        "S1-1"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-27T16:07:04+00:00",
+      "verification": "S1-2 完成（骰型注册表 + rules/dice.yaml + 22 条单测），阶段 1 进行中；本轮预算用尽，S1-3 未开工",
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S1-3",
+      "title": "骰子概率分析 + 判定档位表",
+      "phase": 1,
+      "depends_on": [
+        "S1-2"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-27T16:48:33+00:00",
+      "verification": "S1-3 完成（analyze 精确分布 + outcomes 档位表 + 中文 label），阶段 1 收官；本轮预算用尽，S2-1 未开工",
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S2-1",
+      "title": "信念模型与五点契约",
+      "phase": 2,
+      "depends_on": [
+        "S1-3"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T17:49:21+00:00",
+      "finished_at": "2026-10-27T17:56:47+00:00",
+      "verification": "pytest 1013 passed + 6 skipped（基线 919+6）；ironvale golden 逐字节不变；check_contract/check_world/check_generic/check_docs --strict 全 0 错 0 警；npm run build 通过；无信念时 prompt 逐字节不变，delta 缺 reason 被拒；五点契约五处齐全",
+      "notes": "开工：租约 auto-20261028-0110（fresh）已取得；注意 S1-3 已由并发实例 ai-01 完成（7/29），本轮直接做 S2-1。开工前核对进行中\n开工前核对：①分层=新增 trpg/models/belief.py（M01/L0，doc 头指 M01 总述）、改 models/state.py、engine/state_merge.py、engine/knowledge.py（M13/L4），无新增跨层 import、modules.yaml 无需改（M01→M13 已在依赖里）；②五点契约=模型(trpg/models/belief.py + CharacterRuntime.mindset) / StateDelta 白名单(state_merge: characters.<id>.mindset，写入时过模型校验) / prompt 注入(knowledge.py::render_mindset，缺省不注入) / 文档(M01 字段契约 §二 + M12 总述 + M13 总述) / 字段集测试(test_contract.py RUNTIME_FIELDS + tests/test_s2_belief.py 13 条) 五处同改；③零世界词=label 是不透明标签，词表来自世界包 camp_labels（belief_label_vocab），框架层无阵营名（新增测试 + check_generic 双重保险）；④数值真相源=本步无新阈值（confidence 0..1 是模型边界，由 pydantic Field 约束）；⑤不写 worlds=未读写 worlds/*，缺省为空 → ironvale golden 逐字节不变。参考：C-1（怀疑度=概率+必填依据、框架零世界词）、J 线；联网查 Bayesian belief update LLM agent（怀疑度=旧值×遗忘因子+异常证据×学习率 → 印证 reason 必填与跨轮累积交给 S2-2）与 confidence calibration（自报置信度普遍未校准 → S2-5 用 Brier 校准）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S2-2",
+      "title": "跨回合存储 + 旧信念喂回",
+      "phase": 2,
+      "depends_on": [
+        "S2-1"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T18:58:48+00:00",
+      "finished_at": "2026-10-27T19:04:22+00:00",
+      "verification": "S2-2 完成（agent_beliefs 表 + 跨回合累积 + 失败保留旧信念 + 旧库兼容），pytest 1024 passed + 6 skipped，golden 不变，五道门禁全绿",
+      "notes": "开工：租约 auto-20261028-0250（fresh）已取得；S2-1 已完成（8/29）。开工前核对进行中\n开工前核对：①分层=新增 trpg/storage/beliefs.py(M03/L2)、trpg/engine/beliefs.py(M13/L4)；api/play.py(M14) 依赖 M13/M03 已在 modules.yaml 声明内，无需改；②五点契约=本步不新增状态字段（mindset 是 S2-1 的），改的是存储与回落语义；③零世界词=信念标签仍是不透明串，词表校验走 pack.camp_labels（框架不写阵营名），check_generic 通过；④数值真相源=本步无新阈值（表结构与置信度上界沿用 S2-1）；⑤不写 worlds=未读写 worlds/*，agent_beliefs 是运行库表（SQLite 会话库）不是世界包。参考：C-2（增量更新：旧信念整体进 prompt，模型返回完整新信念 → 引擎侧整包替换）、C-3（失败即保留旧信念，不返回空）；联网查 agent 状态持久化主流做法（SQLite 新表走 CREATE TABLE IF NOT EXISTS + PRAGMA user_version/补列迁移，老库不重建不丢数据 → 本步新表自动补建，无需迁移）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S2-3",
+      "title": "概率信念四步（含守恒重归一）",
+      "phase": 2,
+      "depends_on": [
+        "S2-2"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T20:05:57+00:00",
+      "finished_at": "2026-10-27T20:10:34+00:00",
+      "verification": "S2-3 完成（概率信念四步 + 守恒重归一 + 跨轮平滑 + 依据来源），pytest 1036 passed + 6 skipped，golden 不变，五道门禁全绿",
+      "notes": "开工：租约 auto-20261028-0400（fresh）已取得；S2-2 已完成（9/29）。开工前核对进行中\n开工前核对：①分层=扩展 trpg/engine/beliefs.py（M13/L4）+ 新增 rules/belief.yaml（M02 规则层，由 loader 读取）+ models/belief.py 加 sources 字段（M01）；无新增跨层 import（M13→M01/M02 已在 depends_on 内）；②五点契约=未新增**状态路径**（mindset 路径 S2-1 已有），仅在模型内部加 sources 字段（默认空列表），故白名单无需再改；文档已同步 M01 字段契约 + M13 总述；字段集测试（CharacterRuntime）不变，Suspicion 字段集无契约测试；③零世界词=框架只提供「先验/硬化/微调/重归一」四个通用槽位，「什么算已确认」「哪些阵营敌对」由世界包 knowledge.yaml: belief 声明，测试扫源码禁世界词；④数值真相源=先验下限/硬化取值/微调上限/平滑权重/守恒容差全部进 rules/belief.yaml（新增 Rules.belief 读取），代码不写数值；⑤不写 worlds=未读写 worlds/*，rules/ 是规则层。参考：C-4（deepwolf 概率 copilot 四步 + 每个数字带 reasons）、B-1 守恒约束；联网查 Bayesian prior update + 归一化主流做法（先验×似然 → 后验按和为 1 缩放 → 印证守恒重归一这一步）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S2-4",
+      "title": "结构化发言 + 票理由",
+      "phase": 2,
+      "depends_on": [
+        "S2-3"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T21:11:51+00:00",
+      "finished_at": "2026-10-27T21:17:38+00:00",
+      "verification": "S2-4 完成（结构化发言四字段 + 票理由 + 发言与票对齐），pytest 1047 passed + 6 skipped，golden 不变，五道门禁全绿；发言权竞价留到 S7-3",
+      "notes": "开工：租约 auto-20261028-0500（fresh）已取得；S2-3 已完成（10/29）。开工前核对进行中\n开工前核对：①分层=trpg/agents/schemas.py(M12/L5) 加可选字段与两个新 schema；trpg/models/action.py(M01/L0) PlayerAction 加 4 个可选字段；trpg/engine/phases/collective.py(M13/L4) VoteRecord 加 reason/suspect；trpg/agents/agent/runtime.py(M12) vote_detail；trpg/engine/loop.py(M13) 投票消费怀疑；无新增跨层 import（M13→M12/M01 已在依赖内）；②五点契约=未新增**状态路径**（PlayerAction 是瞬时输入不是 state 字段；VoteRecord 是回执结构），新增字段一律可选且默认空 → 旧快照逐字节不变；文档已同步 M12/M13 总述；③零世界词=立场/欺骗类型都是**不透明标签**，类别词表归世界包，schema 不写类别名（测试扫源码）；④数值真相源=本步无数值；⑤不写 worlds=未读写 worlds/*（竞价见下）。参考：B-2（欺骗类型四分类 + 自评他评双维 → schemas + 世界包类别，本次落 schema 侧）、B-4（发言权竞价 → turn_flow.yaml + collective，属 S7-3 范围，本轮未做）、C-8（竞价：想说话本身就是信息）；联网查 structured debate schema 主流做法（固定分区的结构化输出 + 每段字数/条数上限 + 强制给出判决理由 → 本步 stance/suspect/evidence/deception 四字段 + 票理由）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S2-5",
+      "title": "校准 + 批量 arena + 随机基线 + 判据近似",
+      "phase": 2,
+      "depends_on": [
+        "S2-4"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T22:19:22+00:00",
+      "finished_at": "2026-10-27T23:38:54+00:00",
+      "verification": "S3-1 完成（transition 落库 + 对局导出 JSON + 10 条单测）；本轮预算用尽，S3-2 未开工",
+      "notes": "开工：租约 auto-20261028-0615（fresh）已取得；S2-4 已完成（11/29）。开工前核对进行中\n开工前核对：①分层=新建 trpg/eval/（M16/L7，modules.yaml 已登记 packages+依赖 M01/M02/M03/M05/M12/M13/M18，未越层；纯评测不改运行时）；②五点契约=未新增状态字段（不改 state / delta / prompt）；③零世界词=敌对阵营由 hostile_camps 参数给（世界包词表），--world 必填不写死世界名（check_generic 首轮抓到并已修）；④数值真相源=指标是公式不是阈值，不涉及 rules/*.yaml；⑤不写 worlds=未读写 worlds/*，arena 只读世界包。参考：C-5（怀疑度必须可校准：Brier/skill/Murphy 三分解/可靠性表，采样点选天亮、只统计玩家视角）、C-7（自博弈 arena + 排行榜 + 随机基线）、B-3（阶段一判据机器近似）；联网查 Brier skill score Murphy decomposition reliability diagram 主流做法（按预测概率分箱算预测 vs 实际 + gap；Murphy 用同批分箱）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S3-1",
+      "title": "trace 落库 + 对局导出 JSON",
+      "phase": 3,
+      "depends_on": [
+        "S2-5"
+      ],
+      "status": "done",
+      "started_at": "2026-10-27T23:29:27+00:00",
+      "finished_at": "2026-10-27T23:38:23+00:00",
+      "verification": "新增 trpg/storage/trace.py（save_transition/load_transitions/load_agent_calls/build_session_export）+ schema.py 新增 state_transitions 表（append-only）+ engine/loop.py 在 _persist 落库点写迁移日志（与状态快照同点）+ API GET /api/sessions/{sid}/export 导出单个 JSON（turns/transitions/calls/ending）；只落公开信息（私密心声不进日志）；新增 tests/test_trace_export.py 10 条全过（三类日志齐全/导出只读幂等/append-only/会话隔离/敏感字段不落库/端点可用）；全量 pytest 分批合计 1069 passed + 6 skipped（首跑因并发实例改文件出现 167 errors，复跑全绿，确认是中间态非回归）；四门禁 0 错 0 警；npm run build 通过",
+      "notes": "开工（租约 auto-20261028-ai-07）：读 39 号方案 S3-1 细则；查知识库 F 线（F-2/F-3）；联网核对 trace/对局导出主流做法；读现有 trpg/storage/turn.py、events.py、api/routes/trace.py、trpg/engine/loop.py。五项对齐预判：①分层=只加存储层写库+API导出，不改上层玩法；②五点契约=不改 StateDelta/信念字段；③零世界词=导出不带阵营语义；④数值=无新阈值；⑤不写 worlds=只读世界包不改",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S3-2",
+      "title": "评测 CLI 三件套",
+      "phase": 3,
+      "depends_on": [
+        "S3-1"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-28T00:51:18+00:00",
+      "verification": "S3-2 完成（run.py 三命令 + leaderboard Markdown + 退出码语义 + 12 条测试），阶段 3 收官；本轮预算用尽，S4-1 未开工",
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S4-1",
+      "title": "统一动作提交入口",
+      "phase": 4,
+      "depends_on": [
+        "S3-2"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T01:50:09+00:00",
+      "finished_at": "2026-10-28T02:32:19+00:00",
+      "verification": "S4-1 完成（统一动作提交入口：人机同一条 submit_action + 幂等 + SkillChoice 统一契约），pytest 1087 passed + 6 skipped，golden 不变，五道门禁全绿；顺带修了 S3-2 遗留的 CLI stderr 编码问题",
+      "notes": "开工：租约 auto-20261028-0940（fresh）已取得（取锁时登记的 S3-2 已被并发实例完成，故本轮做实际下一步 S4-1）。开工前核对进行中\n开工前核对：①分层=新增 trpg/engine/actions.py（M13/L4）+ 改 M01 models/action.py（SkillChoice 统一契约）+ M13 phases/context.py（submissions 登记）+ loop.py 接线；**首轮 check_docs 抓到 L4→L5 反向依赖**（engine import agents.schemas）→ 已改为引用 M01 的 SkillChoice，复检 0 错；②五点契约=未新增 state 字段（TurnContext.submissions 是回合内上下文，不是 state 字段）；③零世界词=无世界语义；④数值真相源=无数值；⑤不写 worlds=未读写 worlds/*。参考：E-1（boardgame.io 源码级铁证：bot 与人共用 store.dispatch，bot 不决定轮到谁）、A-5（bot 是一种玩家）；联网查 boardgame.io bot same interface as human / human-in-the-loop action submission（Bot.play 只在给定席位上选动作，dispatch 与人类点击同一条路径）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S4-2",
+      "title": "玩家视图收口为单一服务端出口",
+      "phase": 4,
+      "depends_on": [
+        "S4-1"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T03:33:30+00:00",
+      "finished_at": "2026-10-28T05:02:02+00:00",
+      "verification": "S4-2 完成（玩家视图单一服务端出口 filter_for_viewer + 状态/日志双脱敏 + JSON Patch 差分；扫描并修掉两个真实泄露：快照原始 path id、单回合结果 profession），pytest 1102 passed + 6 skipped，golden 不变，五道门禁全绿。[本条为状态恢复：上一条命令 lease release --outcome interrupted 误把本步退回 pending（租约 step 指向已完成的 S4-2），原 verification 与实现均未变]",
+      "notes": "开工：租约 auto-20261028-1120（fresh）已取得；S4-1 已完成（15/29）。开工前核对进行中\n开工前核对：①分层=新增 trpg/api/views.py（M14/L6）+ 改 trpg/api/deps.py、routes/play.py、routes/trace.py；api 包内互引不越层，未改 modules.yaml；②五点契约=未新增状态字段（视图裁剪不改 state，只改出口）；③零世界词=views.py 只认通用字段名（profession/path/notes/thought），无阵营语义，check_generic 通过；④数值真相源=无数值；⑤不写 worlds=未读写 worlds/*。参考：E-2（boardgame.io filter-player-view.ts：服务端裁状态+日志两处、日志按玩家脱敏、rfc6902 JSON Patch 差分）；联网查 server-side field filtering + rfc6902 json patch incremental sync（boardgame.io 用 createPatch(prevFiltered, filtered) 只发差分，未过滤字段天然不在 patch 里）\n[interrupted] S4-3 未实现：本轮预算用尽（45分钟）且另一实例正在推进同一步，为避免并发改同一批前端文件，本轮只做开工前核对与方案细化（已写入 S4-3 note），步骤退回 pending 等下一轮执行",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S4-3",
+      "title": "seats.yaml + 真人决策面板",
+      "phase": 4,
+      "depends_on": [
+        "S4-2"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T09:07:21+00:00",
+      "finished_at": "2026-10-28T09:51:46+00:00",
+      "verification": "S5-1 完成（NPC 关系双时态：表+模型+prompt注入+消灭 P5-T11 TODO）；本轮预算用尽，S5-2 未开工",
+      "notes": "开工（租约 auto-20261028-ai-11）：读 39 号方案 S4-3 细则；查 E 线参考（E-3/E-4）与 G9；联网核对 seat 声明/人类决策面板主流做法；读现有 trpg/engine/human.py、api/routes/play.py 的人类动作入口、worlds 目录结构。五项对齐预判：①分层=引擎层席位声明+API出口，不改上层玩法；②五点契约=不改 StateDelta/信念字段；③零世界词=席位声明由世界包给（框架只比 id）；④数值=无新阈值；⑤不写 worlds=只读世界包（若细则要求写 worlds/*/seats.yaml，按红线需人工执行，回执写明）\n[reset] 本轮只做开工前核对与方案细化（实现留到下一轮）：①读方案S4-3细则+E线/G9+联网核对(hot-seat/分割标签页/状态面板合并/建议不代替决策)②读现有 src/pages/SetupPage.vue(号位与agent下拉+『换成本人』按钮当前disabled灰显)、src/components/HumanPanel.vue(13个契约id: hp-who/briefs/enemies/thought/action/skill/intent/mode/target/submit/ghost/hint/state/countdown)、trpg/engine/human.py(HumanSeat)③五项对齐：分层=只加声明读取+建局参数+前端两块，不改上层玩法；五点契约=不动StateDelta/信念字段；零世界词=席位label与阵营由世界包给，框架只比id；数值=无新阈值；不写worlds=见下。实现方案(下一轮照做)：A声明层 rules/seats.yaml(label/默认agent/是否人)+读取器优先取 worlds/<id>/ui/seats.yaml(世界包覆盖)；B后端 POST /api/sessions 增 human_seats:[号位序号] 写入 meta.human_ids 并初始化 HumanSeat；GET /api/worlds/<id>/context 增 seats 段；C前端房间页『换成本人』可点(seat.human 切换)+建局带 human_seats+提示本局真人席位数；D真人面板三块：可见信息(身份/私有笔记/敌人/简报)+带理由的建议(信念 top 怀疑+reason，建议只『填入输入框』不自动提交=建议不代替决策)+操作按钮(已有action/skill/intent/mode/target/submit)；E测试 tests/test_s0_seat_human.py(声明读取/建局参数/面板三块源码断言/建议不代替决策断言)；F截图 agent-browser 8010 房间页(换成本人)+对局页(面板三块)。⚠️世界包示例 seats.yaml 因本任务权限红线(写 worlds/** 被 deny)未提交，需人工执行或由用户放置\n[interrupted] S4-3 实现已完成但验证被阻塞：并发实例正在改 trpg/api/routes/worlds.py，该文件当前存在语法错误，仓库无法 import\n[blocked] 阻塞原因：仓库当前不可导入 —— trpg/api/routes/worlds.py 第 433 行 \return { 处 SyntaxError(invalid syntax)，导致 pytest 连收集都失败（conftest → trpg.api.app → routes.worlds）。已确认**非本步引入**：把本轮对该文件的全部改动（seats 计算块 + ui 段 seats 项）撤销后错误仍在，文件内已无任何本步痕迹（seats/S4-3 出现 0 次）；已做排查：python 3.13.14、tokenize 检查括号与三引号均平衡、多次复编译错误稳定复现、等待 75 秒无变化。绕过方案：本步实现**主动不碰**该文件（context.seats 段未接入，房间页拿不到声明时退回 N 号位），并把纯声明层与前端契约断言拆到 tests/test_s0_seat_human.py（不 import API 层），API 侧断言拆到 tests/test_s0_seat_human_api.py（隔离导入失败）。本步已完成的实现：①trpg/rules/seats.py + rules/seats.yaml（席位声明，世界包优先/规则层兜底，label 模板 + human 默认 + 号位→角色 id 映射）②CreateSessionReq.human_seats（1 起号位）+ sessions.py 建局映射 ③GET /api/sessions/{sid}/pending 增 visible（身份/私有笔记/状态）与 suggestions（带 reason 的怀疑度建议）④SetupPage.vue 换成本人按钮可点 + 提交 human_seats + 席位 label ⑤HumanPanel.vue 三块（hp-visible 可见信息 / hp-suggestions 带理由建议 / 既有操作按钮），建议只填输入框不自动提交（建议不代替人决策）⑥13 条新测试（9 条纯逻辑+前端契约、4 条 API）。待办：等并发实例把 worlds.py 改完（恢复可导入）后跑全量回归 + 四门禁 + build + agent-browser 截图验收（房间页换成本人、对局页面板三块），再 finish。\n[reset] 阻塞已解除：并发实例把编辑工具残渣（</new_string>）写进 trpg/api/routes/worlds.py 第 433 行，导致仓库无法 import；本轮已清理（data/plan/_fix_artifact.py，全仓仅此 1 处）并复编译通过，API 层可导入。本轮接手 S4-3 的验证与收尾。\n接手验证：S4-3 实现产物在位（trpg/rules/seats.py + rules/seats.yaml + CreateSessionReq.human_seats + /pending 增 visible/suggestions + HumanPanel.vue 三块 + 13 条测试）；本轮先修仓库语法错误，再跑全量回归 + 五门禁 + build + agent-browser 截图验收\n[reset] 接管过期租约（stale_takeover）：上一轮租约过期留下 in_progress 的僵尸状态，本轮 reset 回 pending 后重跑验证与收尾\n接手验证：实现产物在位（trpg/rules/seats.py + rules/seats.yaml + CreateSessionReq.human_seats + /pending 增 visible/suggestions + SetupPage.vue 换成本人 + HumanPanel.vue 三块 + 13 条测试）；本轮已修仓库语法错误（编辑工具残渣）与 plan_runner.py 的 GBK 打印崩溃，现跑全量回归 + 五门禁 + build + 浏览器验收\n开工前核对（已在 note）：读 39 号方案 S4-3 细则 + E 线 E-3/E-4 + 联网核对 seat 声明与人类决策面板主流做法（hot-seat / 分割标签页 / 状态面板合并 / 建议不代替决策）+ 读 SetupPage.vue/HumanPanel.vue/trpg/engine/human.py；五项对齐：①分层=声明读取(trpg/rules/seats.py)+API 出口+前端两块，不改上层玩法；②五点契约=不动 StateDelta 与信念字段；③零世界词=席位 label 与阵营由世界包给，框架只比 id；④数值=无新阈值；⑤不写 worlds=世界包示例 seats.yaml 因红线未提交（需人工放置）",
+      "last_error": "阻塞原因：仓库当前不可导入 —— trpg/api/routes/worlds.py 第 433 行 \return { 处 SyntaxError(invalid syntax)，导致 pytest 连收集都失败（conftest → trpg.api.app → routes.worlds）。已确认**非本步引入**：把本轮对该文件的全部改动（seats 计算块 + ui 段 seats 项）撤销后错误仍在，文件内已无任何本步痕迹（seats/S4-3 出现 0 次）；已做排查：python 3.13.14、tokenize 检查括号与三引号均平衡、多次复编译错误稳定复现、等待 75 秒无变化。绕过方案：本步实现**主动不碰**该文件（context.seats 段未接入，房间页拿不到声明时退回 N 号位），并把纯声明层与前端契约断言拆到 tests/test_s0_seat_human.py（不 import API 层），API 侧断言拆到 tests/test_s0_seat_human_api.py（隔离导入失败）。本步已完成的实现：①trpg/rules/seats.py + rules/seats.yaml（席位声明，世界包优先/规则层兜底，label 模板 + human 默认 + 号位→角色 id 映射）②CreateSessionReq.human_seats（1 起号位）+ sessions.py 建局映射 ③GET /api/sessions/{sid}/pending 增 visible（身份/私有笔记/状态）与 suggestions（带 reason 的怀疑度建议）④SetupPage.vue 换成本人按钮可点 + 提交 human_seats + 席位 label ⑤HumanPanel.vue 三块（hp-visible 可见信息 / hp-suggestions 带理由建议 / 既有操作按钮），建议只填输入框不自动提交（建议不代替人决策）⑥13 条新测试（9 条纯逻辑+前端契约、4 条 API）。待办：等并发实例把 worlds.py 改完（恢复可导入）后跑全量回归 + 四门禁 + build + agent-browser 截图验收（房间页换成本人、对局页面板三块），再 finish。",
+      "attempts": 3
+    },
+    {
+      "id": "S5-1",
+      "title": "NPC 关系双时态（表+模型+注入）",
+      "phase": 5,
+      "depends_on": [
+        "S4-3"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T09:44:33+00:00",
+      "finished_at": "2026-10-28T09:50:54+00:00",
+      "verification": "新增 npc_relations 表（append-only，valid_from/valid_to 事实区间 + recorded_turn transaction time，旧库 init_db 自动补建）+ trpg/models/relation.py（Relation 模型，双时态 active_at/describe）+ trpg/storage/relations.py（save/close/load/load_at/relations_text）+ prompts/npc.py 关系注入（无关系时不出现空段落）+ play.py 消灭 P5-T11 TODO（relations.npc 给出此刻仍成立的关系）；新增 tests/test_s5_relations.py 13 条全过（表与旧库兼容/写入/会话隔离/闭合后失效但历史留存/时点查询/重新结盟是另一条事实/prompt 注入与空段落/StateDelta 白名单不含 relations 路径/TODO 已消）；全量 pytest 分批 1127 passed + 7 skipped（基线 919+6，golden 逐字节不变）；四门禁 0 错 0 警；npm run build 通过",
+      "notes": "开工（租约 auto-20261028-ai-14）：读 39 号方案 S5-1 细则；读 J 线 J-1（graphiti 双时态：valid time 事实何时成立 / transaction time 系统何时知道；关系是带时间区间的事实而非覆盖写）；联网核对 bi-temporal knowledge graph（Graphiti valid_from/valid_to，事实失效用 valid_to 标记、append-only）；读 trpg/storage/schema.py、trpg/models/state.py（StateDelta=path/op/value 通用 patch）、trpg/engine/state_merge.py（_BASE_PATTERNS 白名单里**无 relations 路径** → 关系值本就进不了 StateDelta，需用测试钉住）、trpg/agents/prompts/npc.py、trpg/api/routes/play.py（relations.npc=[] 的 P5-T11 TODO）。五项对齐：①分层=新增 storage/relations.py(M03/L2) + models/relation.py(M04?) + prompts/npc.py(M12/L5) + api 只读取，不越层；②五点契约=不改 StateDelta 结构与现有字段，只新增关系表与模型；③零世界词=relation.kind 用中性词（ally/rival 之类由调用方给），框架不解释；④数值=weight/valid_from 是数值但不做玩法阈值，不进 yaml 数值真相源（那是玩法数值，关系是数据）；⑤不写 worlds=只读世界包不改",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S5-2",
+      "title": "三因子打分 + 矛盾检测",
+      "phase": 5,
+      "depends_on": [
+        "S5-1"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T11:02:55+00:00",
+      "finished_at": "2026-10-28T11:04:03+00:00",
+      "verification": "S5-2 三因子打分 + 矛盾检测完成：新增 trpg/memory/decay.py（时衰/重要度/相关性算子）与 trpg/memory/contradiction.py（同类型同对象的互相竞争版本→标旧版本 conflict，不覆盖）；recall.py 增 scoring_mode=three_factor 分支 + conflict_enabled 开关 + texts() 冲突前缀；权重/半衰期/阈值全在 config/memory.yaml；缺省 rrf 路径逐字段不变（行为零变化）；9 条新测试；pytest 1136 passed + 7 skipped，四门禁全绿，build 通过，golden 不变",
+      "notes": "开工前核对五件套：①计划细则 S5-2（目标=召回从纯 RRF 升级为时衰+重要度+相关性并能标记矛盾；实现约束=三因子可配 config/memory.yaml / 矛盾显式标记不覆盖 / 缺省仍走原 RRF 路径行为零变化 / 召回结果带冲突标记进 prompt；验证=三因子排序、矛盾标记、缺省不变）②参考 J-2（J 线 10-长期记忆叙事与NPC关系借鉴：认知记忆引擎 yantrikdb Apache-2.0 —— 时间衰减→时衰项、矛盾检测→我们完全缺的能力、自主巩固留 S5-3）与 J-3（混合检索与本地优先：bi-temporal+hybrid retrieval 是共识，后端不换）③联网核对（2026-10-28）：三因子=Generative Agents(Park et al., UIST 2023) 三归一化分数加权求和 + recency 指数衰减，社区常用 w_rel=0.6/w_imp=0.2/w_rec=0.2；矛盾=主流 append-only 不覆盖 + 显式冲突标记/链接（alphaonedev 记忆 A2A 要求三方同时看见 contradicts；Ryumem 用 expired_at 让旧事实退役；Skein never overwrite a contradiction）④读现有代码：trpg/memory/recall.py（hybrid_recall 三路候选 + RRF_K=60 + _fuse_key 稳定 ref）、trpg/storage/memory.py（EventStore.append-only：recent/important/search）、trpg/models/memory.py（CharacterEvent: turn/day/hour/kind/summary/entities/importance 1-10）、config/memory.yaml（recall 段全部数量参数）、trpg/memory/settings.py（MemorySettings 扁平数值通道）、engine/loop.py:1623 事件写入带 entities⑤2.2 五项对齐：分层=M11(L2) 内部新增 decay.py/contradiction.py，不越层不反向；五点契约=不新增 StateDelta 字段、不改事件模型（只读既有字段）；零世界词=判定规则只用 kind/entities/summary 结构，权重与半衰期在 config/memory.yaml（项目参数），代码里无任何专有名词；数值真相源=权重/半衰期/阈值全在 config/memory.yaml，代码不写死数值；不写死 worlds=只读不改 worlds/**。实现落点：trpg/memory/decay.py（新，三因子算子）+ trpg/memory/contradiction.py（新，矛盾检测：同 kind + 共享实体或摘要公共前缀 + 差异够长 → 标旧版本 conflict，不删不改）+ recall.py（RecallItem 增 conflict/conflicts_with/factors；hybrid_recall 增 scoring_mode=three_factor 分支与 conflict 开关；texts() 冲突条目前缀「（与另一条记忆不一致）」）+ settings.py/config/memory.yaml（可配）+ runtime.py/tools.py 透传 + tests/test_s0_memory_scoring.py（9 条）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S5-3",
+      "title": "反思层 + Lorebook 两形态",
+      "phase": 5,
+      "depends_on": [
+        "S5-2"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T12:13:16+00:00",
+      "finished_at": "2026-10-28T13:17:01+00:00",
+      "verification": "S5-4 核对与方案细化完成（方案写入台账 note，实现留到下一轮）；S5-3 已由另一实例完成，租约 step 指向它，保持 done",
+      "notes": "开工前核对五件套：①计划细则 S5-3（目标=每 N 回合把多条记忆巩固成高阶结论；Lorebook 同时支持背景语义检索与设定词条触发；实现约束=①反思层每 N 回合或章节末合并成角色认知/传闻 ②世界包增 lorebook.yaml（keys/priority/sticky/scan_depth）③两种形态并存 ④词条是内容不是框架常量；验证=巩固触发与产出、词条命中与未命中不注入；出口=两形态各有测试+未命中不注入有断言+五道门禁全绿）②参考 J-4（Lorebook 应有两种形态：语义检索式适合找相关背景、词条触发式适合设定精确生效，两者都需要不是二选一；我方落点=世界包 lorebook.yaml + trpg/memory/lorebook.py::match_lorebook + prompts 注入）与 J-5（怀疑度跨轮次平滑=WOLF 基准 arxiv 2512.09187，已在 S2-3 的 belief.py 落地，本步不重复）③联网核对 2026-10-28：反思=Generative Agents(UIST 2023) 的 reflection，每条记忆 1-10 重要分、累计重要度越阈值（其实现为 150）触发巩固读最近高重要度记忆合成高层洞察；Lorebook=SillyTavern World Info 的成熟字段 key/scan_depth/sticky/cool down/delay/priority/constant/selective + 只有关键词出现才注入 + token 预算上限④读现有代码：trpg/memory/（recall.py 三路候选+RRF、settings.py 扁平数值通道）、trpg/world/pack.py（WorldPack dataclass + 世界包加载段，core_text/archive_docs/skills 等可选文件一律 _read_yaml 读不到即空）、trpg/game.py::seed_lore（archive 长文进 _lore 公共桶=语义检索式 Lorebook 已有）、trpg/agents/agent/runtime.py::_recall（召回文本进 prompt 的出口）、trpg/agents/prompts/blocks.py（M12 公共积木）⑤2.2 五项对齐：分层=M11(L2) 新增 consolidation.py/lorebook.py + WorldPack 增一个可选字段（仍 L2），注入点仍走既有 M12 runtime，不反向依赖；五点契约=不新增 StateDelta 字段、不新增事件枚举（巩固结论是结构化派生，不落 character_events 表），WorldPack 新字段为可选、有缺省；零世界词=框架只提供读取与匹配，词条内容全在世界包 lorebook.yaml（本次因红线未提交，框架不含任何词条）；数值真相源=every_n/threshold/min_cluster/max_entries/scan_depth 全在 config/memory.yaml；不写死 worlds=运行时只读 worlds/<id>/lorebook.yaml，文件不存在即无词条。实现落点：trpg/memory/consolidation.py（反思层：should_consolidate 回合倍数或累计重要度越阈值 + consolidate 按共享实体并查集聚类产出 Consolidation(角色认知/传闻) + render）+ trpg/memory/lorebook.py（LoreEntry/parse_entries/match_lorebook/render_lorebook，字段 keys/priority/sticky/scan_depth，未命中不注入）+ trpg/world/pack.py（WorldPack.lorebook_entries + 加载可选 lorebook.yaml）+ trpg/memory/settings.py 与 config/memory.yaml（consolidation/lorebook 两段参数）+ trpg/agents/agent/runtime.py（_recall 出口追加反思结论与词条文本；缺省关闭=零变化）+ tests/test_s0_memory_consolidation_lorebook.py（16 条）",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S5-4",
+      "title": "事件声明 + 区域自治 + 动作三态 + 调度器 + GM 收窄",
+      "phase": 5,
+      "depends_on": [
+        "S5-3"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-28T16:37:51+00:00",
+      "verification": "S5-4 完成（事件声明 + 区域自治 + 动作三态 + 纯代码调度器 + GM schema 裁剪；修掉自己引入的同名覆盖回归）；本轮预算用尽，S5-5 未开工",
+      "notes": "开工前核对（L 级大改，本轮只做核对与方案细化）：读 39 号方案 S5-4 细则；读 J-6（调度器：声明 + 纯代码打分、零 LLM，wenyoo 的 effects 确定性 / intent 模型解释二分）、J-7（GM 输出收窄已有正确做法：schema 级裁剪 enemies/loot，可补『本回合允许引入哪些事件类型』）、I-3（区域三档自由度：regions.<id>.autonomy 声明自己允许什么，自治级别是世界内容放 world.yaml，框架只读）、I-4；联网核对（确定性事件调度器通行做法：稳定排序 + 事件预算 + 冷却 + 条件谓词求值 + 可序列化快照，固定 tick 无 wall-clock）；读现状：trpg/world/pack.py（WorldPack 有 seeds/lorebook/knowledge 与 _read_optional_yaml，但**无 events.yaml**、无 region autonomy）、trpg/agents/prompts/gm.py（_capability + enemies/loot 段已是 schema 级裁剪）、trpg/engine/knowledge.py（match_when + build_knowledge 知识视图）、trpg/engine/loop.py（_phase_* 阶段调度 + seeds 事件种子 + meta_events）。五项对齐：①分层=world 声明 → engine/events.py 纯代码调度 → prompts/gm.py schema 裁剪 → api 只读；②五点契约=events 由**代码**写不经 GM，故不新增 StateDelta 路径（约束⑤天然满足），冷却与事件历史落库（append-only）不进 state；③零世界词=category 用中性词（encounter/discovery/hazard/social），含义由世界包给；④数值真相源=冷却回合数/强度是内容数值放世界包 yaml，框架不写死阈值；⑤不写 worlds=世界包示例 events.yaml 因权限被 deny → 走 rules/events.yaml 兜底 + 世界包覆盖（同 seats.yaml 套路）\n[reset] 本轮只做核对与方案细化（实现留到下一轮，L 级五子目标）。实现方案（下一轮照做）：A声明层：trpg/world/pack.py 用 _read_optional_yaml 读 events.yaml（events: [{id, category, intensity, cooldown_turns, requires, text, effects, intent, regions}]）+ world.yaml 的 regions.<id>.autonomy（{level: low|mid|high, allow, forbid}）；框架零世界词（category 用 encounter/discovery/hazard/social，含义由世界包给）；世界包示例文件因权限不能写 → 同时支持 rules/events.yaml 兜底、世界包覆盖（同 seats.yaml 套路）。B动作三态：trpg/engine/events.py 的 ActionSpec{text 确定性文本 / effects 确定性效果(路径+值，走白名单内 apply_delta) / intent 模型解释意图(只给 GM 参考不自动执行)} + parse_action_spec 解析。C调度器（纯代码零 LLM 可复现）：EventScheduler.score(候选, state, region, turn) = 强度基础分 x requires 满足 x 冷却结束 x 区域自治允许，tie-break 用 trpg/models/rng.py::derive 的 seed 派生 rng；每回合预算 budget 限制条数（预算 0 或无候选 = 安静回合可复现）；冷却与事件历史**落库**（新 trpg/storage/event_log.py，append-only）不进 state、不进 StateDelta 白名单（约束⑤天然满足）。DGM schema 裁剪：prompts/gm.py 的 gm_scene_user 增 allowed_event_categories 参数，调度器结果 + 区域 autonomy 计算（low=只描述既有事实/mid=可加小事件/high=可加新场景），只允许的 category 进 schema。E测试 tests/test_s5_events.py：打分与冷却（同事件冷却内不再出现）、安静回合无事件且可复现、同 seed 同结果、GM schema 只含允许类别、动作三态解析（effects 只走白名单、intent 不自动执行）、框架零世界词断言。F风险：① events 与 cooldown 不进 state → 回滚/重放时要以落库为准（已在 S5-1 的落库思路内）；② 区域 autonomy 是世界内容 → world.yaml 增段属世界包改动，权限禁止写 worlds 时先用 rules 兜底。\n开工（让行时段 22:00-24:30 + L 级大改）：本轮只做开工前核对与方案细化，**不改代码**；实现留到下一轮（让行时段结束后）。S5-4 前一轮由并发实例 ai-17 起过（attempts=1）但未完成，本轮接手核对。\n[reset] 开工前核对五件套（本轮为让行时段 22:00-24:30 且属 L 级大改，只做核对与方案细化，未改代码）：①计划细则 S5-4：目标=事件由世界包声明、由纯代码调度、GM 输出按 schema 收窄；实现约束=①世界包增 events.yaml（category/intensity/cooldown_turns/requires）+ 区域 autonomy 声明 ②动作声明采用 text/effects/intent 三态（确定性与模型解释在数据层分开）③调度器纯代码打分、零 LLM、可预测可复现 ④GM 的 schema 按当前允许的事件类别裁剪（不只 enemies/loot）⑤框架零世界词；验证=单测（事件打分与冷却、安静回合无事件、GM schema 裁剪、动作三态解析）；出口判据=四件事各有测试、安静回合可复现、五道门禁全绿。②参考篇：J-6 事件调度器=声明加纯代码打分、零 LLM（Nebulite JSON DSL 非层级、pgrpg ECS 加 JSON 定义逻辑、GDL 状态决定合法动作）；补充 wenyoo L2=node 上的 triggers 是声明式触发器、effects（确定性）与 intent（LLM 解释）二分；J-7 GM 输出收窄=我们已领先（按 capabilities 做 schema 级裁剪 enemies/loot），可补项=本回合允许引入哪些事件类型也应进 schema 裁剪；I-3 区域三档自由度=应表达为区域声明自己允许什么（regions.<id>.autonomy: level 低中高 加 allow/forbid），三档语义绑定 GM 输出收窄，自治级别属世界内容放 world.yaml、框架只读；I-4 地图生成=结构化拓扑加只读固化，编译产物加校验器查 stale 的范式可供事件调度借用。③联网核对 2026-10-28：确定性事件调度主流做法=离散事件调度器（稳定排序、重复事件、有界快进、可取消、可序列化快照）、headless 确定性模拟（同输入同输出、可回放）、ECS 的 Command Buffer 延迟结构变更加 Scheduler 有序阶段；可复现要点=同输入同输出、排序必须稳定（排序漂移一个事件整体分叉）、随机单一 seed 源、快照可序列化。④读现有代码：trpg/world/pack.py 的 _read_optional_yaml 与 turn_flow_declaration/systems_declaration（可选声明文件的成熟范式，events.yaml 照此落）；trpg/engine/pipeline.py 的 parse_turn_flow/PhaseSpec/plan_turn（阶段已有 when/break_if/repeat 与 params，纯代码调度骨架现成）；trpg/engine/loop.py 的回合主流程与 _run_phases（调度器插入点）；trpg/agents/prompts/gm.py 的 gm_scene_user 与 gm_narrate_batch_user（B31 已按 capabilities 裁剪 enemies/loot，正是 schema 级收窄的现成范式）；trpg/engine/knowledge.py（build_knowledge/select_strategies，知识视图裁剪落点）；worlds/longzu 本地存在（只读）。⑤2.2 五项对齐：分层=声明在 M05/L2 world（pack 读可选 yaml），调度器放 M13/L4 engine（纯函数、不反向依赖 agents），GM 裁剪在 M12/L5 prompts；需在 trpg/modules.yaml 登记新文件的模块与层。五点契约=不新增 StateDelta 字段（事件调度结果不进状态合并白名单，只作为本回合 prompt 上下文与 TurnRecord 记录），避免触发五处同改。零世界词=事件类别名、强度名、区域自治档位全部由世界包声明，框架只比 id 与数值，框架不得有事件类别枚举。数值真相源=打分权重、冷却回合、预算上限、intensity 上限、quiet 阈值进 rules/events.yaml（新增），世界包只声明内容。不写死 worlds=运行时只读 worlds/<id>/events.yaml，示例文件因红线未提交需人工放置，框架无事件即无事件、行为零变化。⑥下一轮实现方案：A 声明层 pack.py 增 events_declaration 与 regions.<id>.autonomy（只读不改 worlds）；B 规则层新增 rules/events.yaml 加 rules/loader.py 读取（权重与阈值）；C 调度器新增 trpg/engine/events.py 纯函数 schedule_events（确定性打分，分数降序加 id 字典序稳定 tiebreak、cooldown_turns 纯代码记账、requires 走命名谓词、每回合预算上限、无事件则 quiet=True，零 LLM 可复现）；D 动作三态 turn_flow.yaml 的 actions 增 text/effects/intent，解析放 engine/pipeline.py 且旧 actions 列表兼容；E GM schema 裁剪在 prompts/gm.py 增本回合允许事件类别裁剪（仿 B31）并由区域自治档位决定是否允许新场景；F 接线 engine/loop.py 在回合推进调用调度器，把 EventPlan 传给 GM prompt 与 TurnRecord，缺省无 events.yaml 则零变化；G 测试 tests/test_s0_events_scheduler.py 覆盖事件打分与冷却、安静回合无事件、GM schema 裁剪、动作三态解析、同 seed 同结果可复现、旧世界零变化；H 验证 pytest 全绿加五道门禁加 golden 不变。备注：S5-4 前一轮由并发实例 ai-17 起过（attempts=1）但未完成，本轮完成核对与方案细化后 reset 回 pending，实现留到让行时段结束后的下一轮。\n[interrupted] 让行时段(22:00-24:30)且 S5-4 属 L 级大改：按规程本轮只做开工前核对与方案细化（细则+参考 I-3/I-4/J-6/J-7+联网核对+读代码+2.2 五项对齐，结论与下一轮实现方案 A~H 已写入该步 note），未改任何代码；S5-4 保持 pending，实现留到让行时段结束后的下一轮。非模型异常。\n[interrupted] 让行时段(22:00-24:30)只读一致性审计：台账与39号状态列一致(20 done)、第五节双轨镜像已同步、第七节收尾检查7项已读入记档；遗留盘点=过期skip原因1处(test_s0_seat_human_api.py:36)、pytest临时目录17个、世界包示例缺3个(需人工放置)；未改任何代码，S5-4 保持 pending，实现留到让行时段结束后的下一轮。非模型异常。",
+      "last_error": null,
+      "attempts": 2
+    },
+    {
+      "id": "S5-5",
+      "title": "天气钩子 + 封锁触发器 + 建筑命名固化",
+      "phase": 5,
+      "depends_on": [
+        "S5-4"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T17:39:07+00:00",
+      "finished_at": "2026-10-28T18:55:29+00:00",
+      "verification": "S6-1 完成（词缀机制 + 三维生成范围 + 价值区间 + 世界包声明的扩展字段白名单）；本轮预算用尽，S6-2 未开工",
+      "notes": "[interrupted] 取锁时误写 step=S5-4（S5-4 已由并发实例 ai-01 完成）；为避免 release 把已完成的 S5-4 退回 pending，改以 --step S5-5 释放（S5-5 本就 pending，无副作用），随后按 S5-5 重新取锁\n开工（S5-4 已由并发实例 ai-01 完成，本轮 21/29）：S5-5 天气钩子 + 封锁触发器 + 建筑命名固化\n开工前核对（I-1/I-2/I-5/I-6 + 联网核对 + 读代码 + 2.2 五项对齐）结论见本步 notes；实现：①trpg/engine/weather.py 新增天气演化钩子（离散标签加过渡声明，框架零天气名；不可转则保持不变；同 seed 同 turn 同结果），rules/clock.yaml 增 weather_transitions（缺省空 = 不演化），loop.py 回合末调用（过渡表为空即零变化）②trpg/engine/events.py 增封锁声明 locks（categories 加 duration_turns），调度器增 blocks 纯代码记账、封锁期内该类别不再入选、到期自动解除 ③trpg/map/worldgen.py 增 name_minor_buildings（次要建筑命名一次后写 named 标记，落 session_map 后只读），sessions.py 建局时命名后落库，无命名器则不命名",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S6-1",
+      "title": "词缀机制 + 生成范围与价值区间",
+      "phase": 6,
+      "depends_on": [
+        "S5-5"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-28T18:55:04+00:00",
+      "verification": "rules/equipment.yaml 新增 affixes 段（id/label/group/slots/tiers/value_range/effect/extra_fields，中性词框架零世界语义）；trpg/models/equipment.py 的 EquipmentInstance 新增 affixes + extra 字段（扩展字段键由世界包声明白名单）；trpg/equipment/roll.py 新增 affix_candidates/roll_affixes/apply_affixes 并在 roll_loot 接入（affix_count 默认 0 → 缺省行为逐值不变）；新增 tests/test_s6_affixes.py 14 条全过（声明齐备/价值区间含端点/槽位与品阶三维过滤/价值落区间/无 rng 取中位/同组互斥/属性加成/扩展字段白名单过滤/缺省零变化/开口子后带词缀/模板路径不受影响）；全量 pytest 分批 1196 passed + 7 skipped（基线 919+6，golden 逐字节不变）；四门禁 0 错 0 警；npm run build 通过",
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S6-2",
+      "title": "品质概率表 + 商店/带入支持 item 与 path",
+      "phase": 6,
+      "depends_on": [
+        "S6-1"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T19:56:46+00:00",
+      "finished_at": "2026-10-28T20:08:52+00:00",
+      "verification": "S6-2 品质概率表 + 商店/带入支持 item 与 path 完成（24/29）：rules/equipment.yaml 增 quality_weights.by_stage（缺省空表=不启用）；roll.py 增 quality_by_stage（按幕次权重抽、传说张力门槛、同 seed 同结果），roll_loot 缺省仍走 2d6（分布与 golden 不变）；growth/shop.py 的 can_apply 扩到 item/path、apply_effect 分派；growth/apply.py 增 apply_item（只带 id）/apply_path/count_carried；growth/carry.py 的 kind 分派扩到 trait/item/path（两处 continue 已消）；AIExtended 增 carried 并同步 C1 字段集测试与 M01 字段契约文档；10 条新测试；pytest 1206 passed + 7 skipped，四门禁全绿，build 通过，golden 不变",
+      "notes": "[interrupted] 取锁时误写 step=S6-1（S6-1 已由并发实例完成）；为避免 release 覆盖已完成步的 verification 或把它退回 pending，改以 --step S6-2 释放（S6-2 本就 pending，无副作用），随后按 S6-2 重新取锁\n开工（S6-1 已由并发实例完成，本轮 23/29）：S6-2 品质概率表 + 商店/带入支持 item 与 path\n开工前核对（H-3/H-4/H-5 + 联网核对 loot rarity weight by level + 读 quality_from_roll/shop.can_apply/carry.apply_carry/rules/equipment.yaml + 2.2 五项对齐）结论见本步 notes；实现：①品质概率按幕次显式化——rules/equipment.yaml 增 quality_weights.by_stage（缺省空表 = 不启用），roll.py 增 quality_by_stage（按权重抽、传说仍受张力门槛、同 seed 同结果），roll_loot 在配置存在时走权重抽、缺省仍走 2d6 映射（rng 消耗顺序不变 → 行为零变化）②shop.can_apply 支持 item 与 path，apply_effect 分派到 growth/apply.py 的 apply_item（只带 id）与 apply_path（写 card.ext.path）③carry.apply_carry 支持 item 与 path（两处 continue 已消），item 只补差额不重复注入，path 一次授予；④AIExtended 增 carried 字段（只带 id），并同步 C1 字段集测试与 M01 字段契约文档",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S6-3",
+      "title": "使用频率加 agent_id + 晋升真跑通",
+      "phase": 6,
+      "depends_on": [
+        "S6-2"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T21:09:52+00:00",
+      "finished_at": "2026-10-28T21:18:57+00:00",
+      "verification": "S6-3 使用频率加 agent_id + 晋升真跑通完成（25/29）：新增 item_usage_agent 表（道具×Agent 维度）+ bump_item_usage(agent_id=) + item_usage_candidates_by_agent；promote.py 增 collect_promotions（只写 data/promotions，绝不写 worlds）；apply_promotions.py 增合并前备份（data/backups/）；check_world 增待确认补丁提示（只提醒不算错误）；真实局跑通（mock 6 回合真实 session ses_537d0f + 角色 chr_p1 → 真实补丁 data/promotions/ironvale__旧灯笼.yaml）；修一处架构违规（promote 直接 import storage 造成 M08→M03 未声明依赖 → 改为调用方传入 rows）；5 条新测试；pytest 1211 passed + 7 skipped，四门禁全绿，build 通过，golden 不变",
+      "notes": "开工（S6-2 已完成，本轮 24/29）：S6-3 使用频率加 agent_id + 晋升真跑通\n开工前核对（H-5/H-6/H-7 + 联网核对 usage frequency promotion + 读 items.py/schema.py/promote.py/apply_promotions.py + 2.2 五项对齐）结论见本步 notes；实现：①新增 item_usage_agent 表（道具 × Agent 维度，CREATE TABLE IF NOT EXISTS 自动建，旧库零风险），bump_item_usage 增 agent_id 参数并同步写两张表，新增 item_usage_candidates_by_agent 聚合②promote.py 增 collect_promotions（按道具 × Agent 的 uses 达阈值才产补丁，只写 data/promotions，绝不写 worlds）③tools/apply_promotions.py 增合并前备份（data/backups/<world>__items__<时间戳>.yaml）④check_world 增「晋升补丁待确认」提示（stale 风格，只提醒不算错误）⑤真实局跑通：run.py 跑了一局 mock（6 回合 4 人，落 data/plan/demo_promo.db），按该局的真实 session 与真实角色 chr_p1 记 3 次使用 → 生成真实补丁 data/promotions/ironvale__旧灯笼.yaml",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S6-4",
+      "title": "世界影响账本 + 能力包覆盖链 + 解锁树",
+      "phase": 6,
+      "depends_on": [
+        "S6-3"
+      ],
+      "status": "done",
+      "started_at": "2026-10-28T22:19:55+00:00",
+      "finished_at": "2026-10-28T23:35:28+00:00",
+      "verification": "S7-1 完成（事件文案表：角色×事件+变量占位+情境提醒，前后端同源，缺省零变化）；本轮预算用尽，S7-2 未开工",
+      "notes": "开工（25/29）：S6-4 世界影响账本 + 能力包覆盖链 + 解锁树（阶段 6 收尾）\n开工前核对（K-2/K-3/K-4 + 联网核对 append-only ledger 与版本化覆盖备份 + 读 wallet/hooks/schema(world_ledger,meta_ledger)/rulespack.assemble + 2.2 五项对齐）结论见本步 notes；实现：①账本追加式语义——ledger.py 修 docstring（实现本就是纯 INSERT，与文档说的「同 key 覆盖」不符）并补 history（某 key 全部历史，可回溯）与 latest（当前视图取最新）②能力包覆盖链——新增 trpg/rulespack/overrides.py（merge_chain：覆盖优先级显式，priority 大者胜、相同则链上靠后者胜；列表按 id 并集合并，解锁树是并集而不是整段替换；save_merged：合并结果回写 data/abilities/merged/<name>.yaml 且每次保存先把上一版备份到 data/backups/）③解锁树依赖校验——新增 trpg/rulespack/unlocks.py（validate_unlocks：命名引用 unlocks[].requires，只检查缺失依赖/成环/自依赖/非命名引用，不做表达式）④新增 rules/abilities.yaml 声明（base 与 extra 两个包 + 四级解锁链），并实际跑出合并产物 data/abilities/merged/abilities.yaml",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S7-1",
+      "title": "事件文案表 prompts/events.yaml",
+      "phase": 7,
+      "depends_on": [
+        "S6-4"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-28T23:35:07+00:00",
+      "verification": "新增 prompts/events.yaml（框架兜底：角色 × 事件 + 变量占位 + 情境提醒，中性词）+ trpg/agents/prompts/events.py（load_event_texts 世界包优先/框架兜底、render_text 变量渲染缺变量留空、text_for 按角色取文案、event_hints 收集提醒；空表 → 空串不注入）+ trpg/api/routes/event_texts.py（GET /api/worlds/{id}/event-texts，前后端同源同一张表）+ app.py 注册路由 + gm_scene_user 增 event_hints 参数（缺省不注入 → prompt 逐字节不变）；新增 tests/test_s7_event_texts.py 15 条全过（兜底存在/空表为空/按角色取文案/未知角色与事件为空串/变量填充与缺变量留空/提醒收集与过滤/端点与读取器同源/代码里无具体措辞/GM 缺省无提醒段且有提醒时注入）；全量 pytest 分批 1237 passed + 7 skipped（基线 919+6，golden 逐字节不变）；四门禁 0 错 0 警；npm run build 通过",
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    },
+    {
+      "id": "S7-2",
+      "title": "M17 世界包工坊（文本到骨架到校验到补丁）",
+      "phase": 7,
+      "depends_on": [
+        "S7-1"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-29T01:44:16+00:00",
+      "verification": "S7-2 完成（M17 世界包工坊：文本→IR→骨架→校验→待确认区，绝不写 worlds/）；本轮预算用尽，S7-3 未开工",
+      "notes": "开工前核对（L 级大改，本轮只做核对与方案细化）：读 39 号方案 S7-2 细则；读 D 线（细则里的 D-3 对应当前编号 D-7 生成—校验—修补闭环：三段形态：抽取 → 生成 → 校验修补；已有三块地基可复用：trpg/rulespack/validate.py::validate_declarations 校验闸、tools/apply_promotions.py + data/promotions 待确认范式、worlds/_blank 空白包脚手架；D-5 LuduScript DSL 不引入）；联网核对（通行做法与 D-7 同构：确定性结构化数据为权威、模型只提候选；先设计验证再生成；生成—运行—检查—修复闭环；人工在环确认）；读现状：tools/check_world.py（check_one = check_world + validate_declarations + inventory 清单）、trpg/rulespack/validate.py（11 类声明校验器）、tools/apply_promotions.py（--apply 才写世界包，默认只预览）、worlds/_blank（18 个文件的世界包骨架模板）。五项对齐：①分层=新增 M17（trpg/workshop/*，预留位）只依赖 M04/M05（不反向依赖），复用 validate_declarations 与 _blank；②五点契约=不新增状态字段、不改 StateDelta 世界包部分（只产出文件）；③零世界词=IR 与骨架字段名中性，具体内容是内容；④数值真相源=IR 里的数值进 yaml 骨架（不写死在代码里）；⑤不写 worlds=产物只进 data/promotions/ 待确认区，人工 --apply 才合并（复用现成范式）\n[reset] 本轮只做核对与方案细化（实现留到下一轮，L 级）。实现方案（下一轮照做）：A新增模块 trpg/workshop/（M17 预留位，packages: [trpg/workshop]，modules.yaml 加 M17 只依赖 M04/M05，避免 check_contract 反向依赖报错）：① ir.py —— 中间表示模型 WorldIR（name/tone/eras/regions/professions/origins/paths/items/npcs/seeds/win_condition/players/ui 等纯数据，字段名中性）+ parse_ir(text) 从模型产出的 JSON 解析（非法 → 明确错误不抛栈）；② scaffold.py —— scaffold_world(ir, target_dir) 以 worlds/_blank 为脚手架复制骨架并填值（world.yaml / systems.yaml / turn_flow.yaml / items.yaml / npcs.yaml / seeds.yaml / regions/*.md / prompts/*.md）；③ pipeline.py —— run_workshop(text, target_id) 三段：文本→IR→骨架→校验；校验复用 trpg/rulespack/validate.py::validate_declarations + tools/check_world 的内容清单逻辑（后者需把清单函数搬进包内或在 workshop 侧实现最小清单）；④ 校验不通过 → 产出错误清单与建议，同样只写待确认区。B产物落点（红线③）：只写 data/promotions/<target_id>/（复用 apply_promotions 待确认范式），绝不写 worlds/*；提供 diff（生成物 vs 现有包）供人工确认；人工用 tools/apply_promotions.py --apply 范式合并。C不引入 DSL（D-5）、不做资产生成（细则⑤，牌面美术后置）。D LLM 环节走项目现有 provider 抽象；同时提供「手工给 IR」的离线入口 → 测试不依赖模型、可跑。E测试 tests/test_s7_workshop.py：IR 解析（合法/非法 JSON）、骨架生成（目录结构与 _blank 一致且含关键文件）、校验失败路径（故意写错 → 报错落待确认区）、产物只在待确认区（断言 worlds/ 无新增文件）、幂等（重跑覆盖待确认区不产生重复副作用）。F风险：①modules.yaml 加 M17 会影响 check_contract（只声明不反向依赖）；②LLM 产 JSON 不稳 → 解析失败要给出可操作的错误（缺哪个键）；③校验器只覆盖声明层，内容层（seed/profession 引用）可能漏检 → 骨架先从 _blank 起步降低风险。\n[interrupted] S7-2 本轮只做开工前核对与方案细化（方案写入台账 note），实现留到下一轮；S7-2 保持 pending",
+      "last_error": null,
+      "attempts": 1
+    },
+    {
+      "id": "S7-3",
+      "title": "同时行动 + free 模式双闸 + 竞价",
+      "phase": 7,
+      "depends_on": [
+        "S7-2"
+      ],
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "verification": null,
+      "notes": null,
+      "last_error": null,
+      "attempts": 0
+    }
+  ],
+  "runs": [
+    {
+      "at": "2026-10-27T06:39:53+00:00",
+      "owner": "auto-20261027-ai-01b",
+      "outcome": "done",
+      "step": "S0-2",
+      "note": "本轮完成 S0-1（已 done）；时间预算用尽，S0-2 未开工，保持 pending"
+    },
+    {
+      "at": "2026-10-27T08:20:12+00:00",
+      "owner": "auto-20261027-ai-02",
+      "outcome": "done",
+      "step": "S0-2",
+      "note": "S0-2 完成（pure layout module + 座位自动缩放），已 finish；本轮预算用尽，S0-3 未开工"
+    },
+    {
+      "at": "2026-10-27T09:09:26+00:00",
+      "owner": "auto-20261027-1624",
+      "outcome": "done",
+      "step": "S0-3",
+      "note": "S0-3 完成（插槽清单 + 出局折叠 + 归属引导 + 中心公共区），已 finish；本轮预算用尽，S0-4 未开工"
+    },
+    {
+      "at": "2026-10-27T10:22:34+00:00",
+      "owner": "auto-20261027-ai-03",
+      "outcome": "done",
+      "step": "S0-4",
+      "note": "S0-4 完成（theme.css 三层 token + 世界包覆盖验证），阶段 0 收官；本轮预算用尽，S1-1 未开工"
+    },
+    {
+      "at": "2026-10-27T12:43:41+00:00",
+      "owner": "auto-20261027-1923",
+      "outcome": "done",
+      "step": "S1-1",
+      "note": "S1-1 完成（战斗数值进 rules/combat.yaml，engine 只读不算，golden 不变），已 finish；本轮预算用尽，S1-2 未开工"
+    },
+    {
+      "at": "2026-10-27T16:07:04+00:00",
+      "owner": "auto-20261027-ai-05",
+      "outcome": "done",
+      "step": "S1-2",
+      "note": "S1-2 完成（骰型注册表 + rules/dice.yaml + 22 条单测），阶段 1 进行中；本轮预算用尽，S1-3 未开工"
+    },
+    {
+      "at": "2026-10-27T16:48:33+00:00",
+      "owner": "auto-20261028-ai-01",
+      "outcome": "done",
+      "step": "S1-3",
+      "note": "S1-3 完成（analyze 精确分布 + outcomes 档位表 + 中文 label），阶段 1 收官；本轮预算用尽，S2-1 未开工"
+    },
+    {
+      "at": "2026-10-27T17:56:47+00:00",
+      "owner": "auto-20261028-0110",
+      "outcome": "done",
+      "step": "S2-1",
+      "note": "pytest 1013 passed + 6 skipped（基线 919+6）；ironvale golden 逐字节不变；check_contract/check_world/check_generic/check_docs --strict 全 0 错 0 警；npm run build 通过；无信念时 prompt 逐字节不变，delta 缺 reason 被拒；五点契约五处齐全"
+    },
+    {
+      "at": "2026-10-27T19:04:22+00:00",
+      "owner": "auto-20261028-0250",
+      "outcome": "done",
+      "step": "S2-2",
+      "note": "S2-2 完成（agent_beliefs 表 + 跨回合累积 + 失败保留旧信念 + 旧库兼容），pytest 1024 passed + 6 skipped，golden 不变，五道门禁全绿"
+    },
+    {
+      "at": "2026-10-27T20:10:34+00:00",
+      "owner": "auto-20261028-0400",
+      "outcome": "done",
+      "step": "S2-3",
+      "note": "S2-3 完成（概率信念四步 + 守恒重归一 + 跨轮平滑 + 依据来源），pytest 1036 passed + 6 skipped，golden 不变，五道门禁全绿"
+    },
+    {
+      "at": "2026-10-27T21:17:38+00:00",
+      "owner": "auto-20261028-0500",
+      "outcome": "done",
+      "step": "S2-4",
+      "note": "S2-4 完成（结构化发言四字段 + 票理由 + 发言与票对齐），pytest 1047 passed + 6 skipped，golden 不变，五道门禁全绿；发言权竞价留到 S7-3"
+    },
+    {
+      "at": "2026-10-27T22:28:17+00:00",
+      "owner": "auto-20261028-0615",
+      "outcome": "done",
+      "step": "S2-5",
+      "note": "S2-5 完成（纯内存 arena + 校准 + 随机基线 + 判据近似，三条命令可跑，基线数字已记录在案），pytest 1059 passed + 6 skipped，golden 不变，五道门禁全绿"
+    },
+    {
+      "at": "2026-10-27T23:38:54+00:00",
+      "owner": "auto-20261028-ai-07",
+      "outcome": "done",
+      "step": "S2-5",
+      "note": "S3-1 完成（transition 落库 + 对局导出 JSON + 10 条单测）；本轮预算用尽，S3-2 未开工"
+    },
+    {
+      "at": "2026-10-28T00:51:18+00:00",
+      "owner": "auto-20261028-ai-08",
+      "outcome": "done",
+      "step": "S3-2",
+      "note": "S3-2 完成（run.py 三命令 + leaderboard Markdown + 退出码语义 + 12 条测试），阶段 3 收官；本轮预算用尽，S4-1 未开工"
+    },
+    {
+      "at": "2026-10-28T02:32:19+00:00",
+      "owner": "auto-20261028-0940",
+      "outcome": "done",
+      "step": "S4-1",
+      "note": "S4-1 完成（统一动作提交入口：人机同一条 submit_action + 幂等 + SkillChoice 统一契约），pytest 1087 passed + 6 skipped，golden 不变，五道门禁全绿；顺带修了 S3-2 遗留的 CLI stderr 编码问题"
+    },
+    {
+      "at": "2026-10-28T03:57:33+00:00",
+      "owner": "auto-20261028-1120",
+      "outcome": "done",
+      "step": "S4-2",
+      "note": "S4-2 完成（玩家视图单一服务端出口 filter_for_viewer + 状态/日志双脱敏 + JSON Patch 差分；扫描并修掉两个真实泄露：快照原始 path id、单回合结果 profession），pytest 1102 passed + 6 skipped，golden 不变，五道门禁全绿"
+    },
+    {
+      "at": "2026-10-28T05:01:42+00:00",
+      "owner": "auto-20261028-ai-11",
+      "outcome": "interrupted",
+      "step": "S4-2",
+      "note": "S4-3 未实现：本轮预算用尽（45分钟）且另一实例正在推进同一步，为避免并发改同一批前端文件，本轮只做开工前核对与方案细化（已写入 S4-3 note），步骤退回 pending 等下一轮执行"
+    },
+    {
+      "at": "2026-10-28T06:15:06+00:00",
+      "owner": "auto-20261028-ai-12",
+      "outcome": "interrupted",
+      "step": "S4-3",
+      "note": "S4-3 实现已完成但验证被阻塞：并发实例正在改 trpg/api/routes/worlds.py，该文件当前存在语法错误，仓库无法 import"
+    },
+    {
+      "at": "2026-10-28T09:12:42+00:00",
+      "owner": "auto-20261028-1706",
+      "outcome": "done",
+      "step": "S4-3",
+      "note": "S4-3 完成（seats.yaml 席位声明 + 换成本人可点 + 真人面板三块：可见信息/带理由的建议/操作按钮；建议不代替人决策），pytest 1114 passed + 7 skipped，golden 不变，五道门禁全绿，浏览器验收通过；另修 worlds.py 工具残渣与 plan_runner GBK 崩溃"
+    },
+    {
+      "at": "2026-10-28T09:51:46+00:00",
+      "owner": "auto-20261028-ai-14",
+      "outcome": "done",
+      "step": "S4-3",
+      "note": "S5-1 完成（NPC 关系双时态：表+模型+prompt注入+消灭 P5-T11 TODO）；本轮预算用尽，S5-2 未开工"
+    },
+    {
+      "at": "2026-10-28T11:04:03+00:00",
+      "owner": "auto-20261028-1853",
+      "outcome": "done",
+      "step": "S5-2",
+      "note": "S5-2 三因子打分 + 矛盾检测完成：新增 trpg/memory/decay.py（时衰/重要度/相关性算子）与 trpg/memory/contradiction.py（同类型同对象的互相竞争版本→标旧版本 conflict，不覆盖）；recall.py 增 scoring_mode=three_factor 分支 + conflict_enabled 开关 + texts() 冲突前缀；权重/半衰期/阈值全在 config/memory.yaml；缺省 rrf 路径逐字段不变（行为零变化）；9 条新测试；pytest 1136 passed + 7 skipped，四门禁全绿，build 通过，golden 不变"
+    },
+    {
+      "at": "2026-10-28T12:14:15+00:00",
+      "owner": "auto-20261028-2004",
+      "outcome": "done",
+      "step": "S5-3",
+      "note": "S5-3 反思层 + Lorebook 两形态完成：新增 trpg/memory/consolidation.py（回合倍数或累计重要度阈值触发 + 共享实体聚类 → 角色认知/传闻）与 trpg/memory/lorebook.py（keys/priority/sticky/scan_depth，未命中不注入）；WorldPack 增 lorebook_entries 读可选 worlds/<id>/lorebook.yaml（示例因红线未提交，需人工放置）；runtime.py::_recall 出口追加反思结论与词条文本（缺省关闭零变化）；16 条新测试；pytest 1152 passed + 7 skipped，四门禁全绿，build 通过，golden 不变"
+    },
+    {
+      "at": "2026-10-28T13:17:01+00:00",
+      "owner": "auto-20261028-ai-17",
+      "outcome": "done",
+      "step": "S5-3",
+      "note": "S5-4 核对与方案细化完成（方案写入台账 note，实现留到下一轮）；S5-3 已由另一实例完成，租约 step 指向它，保持 done"
+    },
+    {
+      "at": "2026-10-28T14:21:55+00:00",
+      "owner": "auto-20261028-2215",
+      "outcome": "interrupted",
+      "step": "S5-4",
+      "note": "让行时段(22:00-24:30)且 S5-4 属 L 级大改：按规程本轮只做开工前核对与方案细化（细则+参考 I-3/I-4/J-6/J-7+联网核对+读代码+2.2 五项对齐，结论与下一轮实现方案 A~H 已写入该步 note），未改任何代码；S5-4 保持 pending，实现留到让行时段结束后的下一轮。非模型异常。"
+    },
+    {
+      "at": "2026-10-28T15:24:20+00:00",
+      "owner": "auto-20261028-2315",
+      "outcome": "interrupted",
+      "step": "S5-4",
+      "note": "让行时段(22:00-24:30)只读一致性审计：台账与39号状态列一致(20 done)、第五节双轨镜像已同步、第七节收尾检查7项已读入记档；遗留盘点=过期skip原因1处(test_s0_seat_human_api.py:36)、pytest临时目录17个、世界包示例缺3个(需人工放置)；未改任何代码，S5-4 保持 pending，实现留到让行时段结束后的下一轮。非模型异常。"
+    },
+    {
+      "at": "2026-10-28T16:37:51+00:00",
+      "owner": "auto-20261029-ai-01",
+      "outcome": "done",
+      "step": "S5-4",
+      "note": "S5-4 完成（事件声明 + 区域自治 + 动作三态 + 纯代码调度器 + GM schema 裁剪；修掉自己引入的同名覆盖回归）；本轮预算用尽，S5-5 未开工"
+    },
+    {
+      "at": "2026-10-28T17:38:54+00:00",
+      "owner": "auto-20261029-0130",
+      "outcome": "interrupted",
+      "step": "S5-5",
+      "note": "取锁时误写 step=S5-4（S5-4 已由并发实例 ai-01 完成）；为避免 release 把已完成的 S5-4 退回 pending，改以 --step S5-5 释放（S5-5 本就 pending，无副作用），随后按 S5-5 重新取锁"
+    },
+    {
+      "at": "2026-10-28T17:48:52+00:00",
+      "owner": "auto-20261029-0130",
+      "outcome": "done",
+      "step": "S5-5",
+      "note": "S5-5 天气钩子 + 封锁触发器 + 建筑命名固化完成（阶段 5 收官，22/29）：新增 trpg/engine/weather.py（离散标签加过渡声明，框架零天气名，不可转即保持不变，同 seed 同 turn 同结果）+ rules/clock.yaml 的 weather_transitions（缺省空表=不演化）+ loop.py 回合末调用；engine/events.py 增封锁声明 locks 与纯代码 blocks 记账（封锁期内该类别不入选、到期自动解除）；map/worldgen.py 增 name_minor_buildings（次要建筑命名一次后写 named 标记随 session_map 只读）+ sessions.py 建局命名后落库；11 条新测试；pytest 1182 passed + 7 skipped，四门禁全绿，build 通过，golden"
+    },
+    {
+      "at": "2026-10-28T18:55:29+00:00",
+      "owner": "auto-20261029-ai-03",
+      "outcome": "done",
+      "step": "S5-5",
+      "note": "S6-1 完成（词缀机制 + 三维生成范围 + 价值区间 + 世界包声明的扩展字段白名单）；本轮预算用尽，S6-2 未开工"
+    },
+    {
+      "at": "2026-10-28T19:56:36+00:00",
+      "owner": "auto-20261029-0355",
+      "outcome": "interrupted",
+      "step": "S6-2",
+      "note": "取锁时误写 step=S6-1（S6-1 已由并发实例完成）；为避免 release 覆盖已完成步的 verification 或把它退回 pending，改以 --step S6-2 释放（S6-2 本就 pending，无副作用），随后按 S6-2 重新取锁"
+    },
+    {
+      "at": "2026-10-28T20:08:52+00:00",
+      "owner": "auto-20261029-0355",
+      "outcome": "done",
+      "step": "S6-2",
+      "note": "S6-2 品质概率表 + 商店/带入支持 item 与 path 完成（24/29）：rules/equipment.yaml 增 quality_weights.by_stage（缺省空表=不启用）；roll.py 增 quality_by_stage（按幕次权重抽、传说张力门槛、同 seed 同结果），roll_loot 缺省仍走 2d6（分布与 golden 不变）；growth/shop.py 的 can_apply 扩到 item/path、apply_effect 分派；growth/apply.py 增 apply_item（只带 id）/apply_path/count_carried；growth/carry.py 的 kind 分派扩到 trait/item/path（两处 continue 已消）；AIExtended 增 carried 并同步 C1 字段集测试与 "
+    },
+    {
+      "at": "2026-10-28T21:18:57+00:00",
+      "owner": "auto-20261029-0530",
+      "outcome": "done",
+      "step": "S6-3",
+      "note": "S6-3 使用频率加 agent_id + 晋升真跑通完成（25/29）：新增 item_usage_agent 表（道具×Agent 维度）+ bump_item_usage(agent_id=) + item_usage_candidates_by_agent；promote.py 增 collect_promotions（只写 data/promotions，绝不写 worlds）；apply_promotions.py 增合并前备份（data/backups/）；check_world 增待确认补丁提示（只提醒不算错误）；真实局跑通（mock 6 回合真实 session ses_537d0f + 角色 chr_p1 → 真实补丁 data/promotions/ironvale__旧灯笼.yaml）；修一处架构违规（promote 直接 import storage 造成 M08"
+    },
+    {
+      "at": "2026-10-28T22:29:39+00:00",
+      "owner": "auto-20261029-0640",
+      "outcome": "done",
+      "step": "S6-4",
+      "note": "S6-4 世界影响账本 + 能力包覆盖链 + 解锁树完成（26/29，阶段 6 收官）：ledger.py 修 docstring（追加式语义）+ 补 history/latest（可回溯）；新增 trpg/rulespack/overrides.py（覆盖优先级显式、列表按 id 并集、合并回写 data/abilities/merged 且每次保存先备份到 data/backups）、trpg/rulespack/unlocks.py（命名引用依赖校验）、rules/abilities.yaml（两包 + 四级解锁链）；跑出真实合并产物 data/abilities/merged/abilities.yaml；11 条新测试；pytest 1222 passed + 7 skipped，四门禁全绿，build 通过，golden 不变"
+    },
+    {
+      "at": "2026-10-28T23:35:28+00:00",
+      "owner": "auto-20261029-ai-07",
+      "outcome": "done",
+      "step": "S6-4",
+      "note": "S7-1 完成（事件文案表：角色×事件+变量占位+情境提醒，前后端同源，缺省零变化）；本轮预算用尽，S7-2 未开工"
+    },
+    {
+      "at": "2026-10-29T00:35:08+00:00",
+      "owner": "auto-20261029-ai-08",
+      "outcome": "interrupted",
+      "step": "S7-2",
+      "note": "S7-2 本轮只做开工前核对与方案细化（方案写入台账 note），实现留到下一轮；S7-2 保持 pending"
+    },
+    {
+      "at": "2026-10-29T01:44:16+00:00",
+      "owner": "auto-20261029-ai-09",
+      "outcome": "done",
+      "step": "S7-2",
+      "note": "S7-2 完成（M17 世界包工坊：文本→IR→骨架→校验→待确认区，绝不写 worlds/）；本轮预算用尽，S7-3 未开工"
+    }
+  ]
+}

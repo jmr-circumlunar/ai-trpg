@@ -1,0 +1,23 @@
+# 能力开关：狼人杀只保留「时间 + 身份 + 出局 + 人类席位」。
+#
+# 关掉的每一项都同时在四处生效（阶段 / 工具 / 可写字段 / 前端区块）：
+#   judge     → 不掷骰，TurnRecord.outcomes 为空
+#   combat    → 没有敌人申报、没有战斗轮、enemies 字段不可写
+#   equipment → 没有背包与装备，inventory 不可写
+#   map       → 不能移动，scene.location_id 不可写
+#   long_memory → recall 工具不可见
+#   events    → 不抽事件种子（种子文件只用于氛围提示）
+systems:
+  time:        { enabled: true, required: true }
+  identity:    { enabled: true }
+  death:       { enabled: true }
+  human_seat:  { enabled: true }
+
+  judge:       { enabled: false }
+  combat:      { enabled: false }
+  equipment:   { enabled: false }
+  map:         { enabled: false }
+  long_memory: { enabled: false }
+  meta_growth: { enabled: false }
+  events:      { enabled: false }
+  immersion:   { enabled: false }

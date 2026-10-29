@@ -33,10 +33,24 @@ organizations:
     attitude_to_player: 1
     resources: [巡逻, 牢房, 通缉令]
 
+# regions：label 用于叙事，entry 是该区域的落地地点 id
+# （地点明细见 regions/<id>.md 的表格；地点 id 必须与表格第一列一致）
 regions:
   north_port:
     label: 北港
-    locations: 8
+    entry: loc_plaza
+    adjacent: [old_quarter]
+    # 港城有夜巡队，但行会当道：秩序只算中等
+    order: medium
+    authority: [npc_watch_captain]
   old_quarter:
     label: 旧城
-    locations: 7
+    entry: loc_old_gate
+    adjacent: [north_port]
+    order: low
+    authority: [npc_watch_captain]
+
+# 日历：第 1 天是哪一天（真实日期 = start_date + (day - 1)）
+# 有日历才能显示「1348年4月12日 星期日」；留空则退回「第 N 天」
+calendar:
+  start_date: 1348-04-12

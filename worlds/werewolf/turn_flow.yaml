@@ -1,0 +1,125 @@
+﻿# 一个回合 = 夜（分组私密）→ 天亮公布 → 判胜 → 白天发言 → 投票 → 放逐 → 判胜
+#
+# 注意：`night` / `dawn` / `vote` / `exile` 都是**本世界自己起的名字**，
+# 框架只认 `kind`（action / broadcast / check / collective / apply）。
+# 这就是「昼夜两套流程、框架内无昼夜概念」的实际样子。
+#
+# `banner` = 主持人播报台词。框架把这个字符串原样发给前端当「中控台旁白」——
+# 玩家靠它知道现在进行到哪一步。文案属于世界内容，框架里一个字也不写。
+
+from: minimal
+mode: turn_based
+
+declare:
+  order: fixed
+
+# 白天每人最多说 2 次；只有同场的人能听到
+comms:
+  mode: limited
+  quota: per_actor_per_turn
+  max_per_turn: 2
+  audience: present
+
+phases:
+  # ── 夜：狼人共议后各自行动，其他人不知道发生了什么 ──────────
+  #
+  # `actors: groups` = 只有 `groups` 里声明的组成员在夜里行动（村民闭眼）。
+  # 不写 `actors` 时全员都会申报一次行动——那不是标准板的行为。
+  - id: night
+    kind: action
+    banner: 天黑请闭眼。狼人请睁眼，商量今晚的目标。
+    visibility: group
+    actors: groups
+    groups:
+      # `mode: council` = 先有限轮私下商议，再投一轮定目标。
+      # `targets: outside` = 从**组外存活者**里选。不配的话候选人默认是组内，
+      # 狼人会把票投给自己人——真实模型跑出来时真的把队友杀了。
+      # `rounds` / `budget_s` 是两道闸：轮次与真实秒数，任一先到就停，不无限聊。
+      - by: camp
+        value: wolf
+        name: 狼
+        mode: council
+        rounds: 2
+        budget_s: 45
+        targets: outside
+
+  # ── 夜里的技能：查验 / 解药 / 毒药（只有持技能的人参与）──────
+  #
+  # 顺序是标准板的关键：先让狼定下刀口（上一步），女巫才能决定救不救；
+  # 技能结算完再落实刀杀（解药因此能把人救下来）。
+  - id: night_skill
+    kind: skill
+    banner: 狼人闭眼。预言家、女巫请睁眼。
+    window: night
+
+  # ── 把夜里的决议落实：被选中的人出局（不落实的话夜里等于没发生）────
+  - id: night_kill
+    kind: apply
+    banner: 所有人闭眼，天快亮了。
+    target: consensus_result
+    effect: eliminate
+    # 遗言（标准规则）：出局那一刻说一句公开发言——可以指认、可以交代身份、也可以撒谎。
+    # 标准板里「只有首夜死者有夜间遗言」，第二夜起夜里出局就静默；被投出局者始终有。
+    last_words: true
+    last_words_when: first_turn
+
+  # ── 天亮：公布本回合出局名单（代码查状态，GM 只负责叙述）──────
+  # 无人出局时公布「平安夜」——这也是标准板允许公开的信息。
+  - id: dawn
+    kind: broadcast
+    banner: 天亮了，所有人睁眼。
+    source: eliminated_this_turn
+
+  # ── 夜里可能已经分出胜负，先判一次 ──────────────────────
+  - id: check_night
+    kind: check
+    break_if: win_decided
+
+  # ── 白天：公开轮流发言 ────────────────────────────────
+  #
+  # 发言顺序按标准板：**从本回合出局者的下一位开始**，单数天顺着座位数、
+  # 双数天反着数（`by_day_parity`）。座位表不写死——不填 `fixed_sequence` 时
+  # 按角色 id 升序（建卡顺序 = 入座顺序），框架只绕圈，不认识「几号位」这种概念。
+  - id: discuss
+    kind: action
+    banner: 白天发言开始，从出局者的下一位说起。
+    visibility: public
+    order: fixed
+    start_after: last_death
+    direction: by_day_parity
+
+  # ── 自爆窗口（A5）：狼人可以当场出局 → 写回合标记 → 直接入下一夜 ──
+  #
+  # 说完一轮话之后、投票之前是标准板的自爆时机：自爆立刻生效，
+  # 当天的投票与放逐都不再发生（`break_if` 让后续阶段全部进 skipped）。
+  - id: day_skill
+    kind: skill
+    banner: 投票之前，还有最后一次机会。
+    window: day
+  - id: check_burst
+    kind: check
+    break_if: flag_set
+    with: { flag: burst }
+
+  # ── 投票：代码计票，平票重投（本轮无人出局）──────────────
+  - id: vote
+    kind: collective
+    banner: 请投票，得票最多者出局。
+    rule: plurality
+    tie: runoff
+    eligible: alive
+    # 平票重投：只让平票的几个人再被投一轮；再平票才无人出局。
+    rounds: 2
+
+  # ── 放逐：把票型落实为出局 ────────────────────────────
+  - id: exile
+    kind: apply
+    banner: 宣布投票结果。
+    target: collective_result
+    effect: eliminate
+    last_words: true
+
+  # ── 放逐后可能立刻终局 ────────────────────────────────
+  - id: check_vote
+    kind: check
+    break_if: win_decided

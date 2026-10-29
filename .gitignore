@@ -8,6 +8,7 @@ __pycache__/
 .pytest_cache/
 .idea/
 .vscode/
+.codebuddy/
 
 # SQLite（含向量与 trace，不进仓库）
 *.db

@@ -1,0 +1,26 @@
+# 记忆策略。**本文件可以整份删掉** —— 删掉 = 用 config/memory.yaml 的默认。
+#
+# 硬规则：短期记忆（近 N 回合常驻）**不可关，只能调窗口**（recent_turns ≥ 1），
+# 关掉等于 Agent 当场失忆，那不是玩法（约束 06 §四 更正 1）。
+#
+# ── 预设 A：标准 ───────────────────────────────────────────
+recent_turns: 3        # ≥1
+summary_every: 5       # 0 = 关闭摘要（上下文会变长）
+long_term:
+  enabled: true        # 关掉 = recall 工具不可见、archive 不入向量
+  top_k: 6
+  vector_k: 12
+
+# ── 预设 B：无长期记忆（轻量局）────────────────────────────
+# recent_turns: 2
+# summary_every: 0
+# long_term:
+#   enabled: false
+#
+# ── 预设 C：重记忆（长线世界）──────────────────────────────
+# recent_turns: 5
+# summary_every: 8
+# long_term:
+#   enabled: true
+#   top_k: 10
+#   vector_k: 24

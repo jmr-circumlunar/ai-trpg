@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────
+# 空白模板世界包（worlds/_blank）
+#
+# 用途：复制这个目录改 YAML 就能建新世界，不需要改一行代码。
+# 注意：下划线开头的目录不会出现在「选世界」列表里（discover_worlds 排除），
+#      跑它必须显式指定：
+#          python run.py run --world _blank --provider mock --turns 3
+#      它同时是 CI 用例（tests/test_blank_world.py），模板一旦漂移，测试先红。
+#
+# 字段说明见同目录 README.md；能力清单见 README「能力清单」章节。
+# ─────────────────────────────────────────────────────────────
+
+schema_version: 1
+world_id: _blank
+name: 空白模板
+
+# 基调与文风：进 GM prompt
+tone: 冷峻、克制
+style: 冷峻、克制，少形容词
+
+default_era: base        # 必须对应 eras/<id>.yaml
+default_region: main     # 必须对应 regions/<id>.md
+
+# 禁忌：进 prompt，告诉模型什么不许写
+taboos:
+  - 不要替玩家决定他做了什么
+
+# 势力（可留空）。每项支持：label / attitude_to_player / resources
+organizations: {}
+
+# 区域：entry 必须是 regions/<region>.md 地点表里的 loc_* id
+regions:
+  main:
+    label: 起始区域
+    entry: loc_01
+    adjacent: []
+    order: 1
+    authority: ""
+
+# 日历：留空则界面显示「第 N 天」
+calendar:
+  start_date: ""

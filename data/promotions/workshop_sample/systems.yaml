@@ -1,0 +1,42 @@
+# 能力开关。**本文件可以整份删掉** —— 删掉 = 已实现系统全部开启、预留系统关闭。
+#
+# 字段：
+#   enabled    是否启用（默认 true）
+#   required   必开系统，不许关（只有 time 是）
+#   requires   依赖：依赖未开则整包报错（C47）
+#   conflicts  互斥：同时开启报错
+#
+# 完整清单（每个系统的影响面）见 README「能力清单」章节，
+# 或运行：python tools/describe_capabilities.py
+#
+# ── 预设 A：full（全开，等于不写本文件）────────────────────
+systems:
+  time:        { enabled: true, required: true }
+  map:         { enabled: true }
+  identity:    { enabled: true }
+  equipment:   { enabled: true }
+  combat:      { enabled: true }
+  death:       { enabled: true }
+  judge:       { enabled: true }
+  long_memory: { enabled: true }
+  meta_growth: { enabled: true }
+  events:      { enabled: true }
+  immersion:   { enabled: true }
+  human_seat:  { enabled: false }
+
+# ── 预设 B：minimal（极简叙事，把下面这段替换掉预设 A）─────
+# systems:
+#   time:        { enabled: true, required: true }
+#   identity:    { enabled: true }
+#   death:       { enabled: true }
+#   judge:       { enabled: false }      # 不掷骰
+#   combat:      { enabled: false }
+#   equipment:   { enabled: false }
+#   map:         { enabled: false }
+#   long_memory: { enabled: false }
+#   meta_growth: { enabled: false }
+#   events:      { enabled: false }
+#   immersion:   { enabled: false }
+#   human_seat:  { enabled: false }
+#
+# 注意：weather 是「已预留未实现」，写 enabled: true 会被 check_world 报错（约束 06 §五）。

@@ -1,0 +1,4 @@
+seeds:
+- id: evt_1
+  type: social
+  skeleton: 一个用于验证管线的样例事件

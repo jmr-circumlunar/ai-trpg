@@ -1,0 +1,24 @@
+schema_version: 1
+world_id: _blank
+name: 工坊样例世界
+tone: 用于验证工坊管线的样例世界
+style: 冷峻、克制，少形容词
+default_era: base
+default_region: main
+taboos:
+- 不要替玩家决定他做了什么
+organizations: {}
+regions:
+  main:
+    label: 起始区域
+    entry: loc_01
+    adjacent: []
+    order: 1
+    authority: ''
+calendar:
+  start_date: ''
+id: workshop_sample
+players:
+  default: 4
+  min: 2
+  max: 6

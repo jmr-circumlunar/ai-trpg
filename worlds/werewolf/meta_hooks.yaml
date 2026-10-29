@@ -1,0 +1,3 @@
+# 局外成长关闭（systems.meta_growth = false），价目表留空。
+spend_rules: []
+earn_rules: []

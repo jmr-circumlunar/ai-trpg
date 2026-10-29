@@ -1,0 +1,4 @@
+# 局外成长价目表。留空 = 本世界不提供局外成长（systems.meta_growth 关掉即可）。
+# 每条 spend_rule：kind(skill/talent/path/item) + target（必须在本世界真实存在，C31）+ price。
+spend_rules: []
+earn_rules: []

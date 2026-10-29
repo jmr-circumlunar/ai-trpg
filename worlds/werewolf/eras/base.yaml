@@ -1,0 +1,6 @@
+# 时代：狼人杀没有技术水平概念，只保留最低配置。
+id: base
+label: 无技术区分
+tech_level: medieval
+tier_max: 1
+allowed_tags: []

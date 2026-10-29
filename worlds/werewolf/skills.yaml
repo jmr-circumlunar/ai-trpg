@@ -1,0 +1,65 @@
+# 主动技能（A2）：身份 → 能力 → 效果 → 消耗。
+#
+# 框架只认 `manifest.skill_effects` 里的**固定原语**（reveal_camp / heal / poison /
+# shoot / self_eliminate），世界包不能写效果脚本（方案 26 已否决任意表达式）。
+#
+# `hint` = 给模型的策略提示（进 prompt）。这不是装饰：技能提示里没有准则时，
+# 模型会「首夜盲毒」「白天无理由自爆」——实测真实模型两局都这么干过。
+
+schema_version: 1
+
+skills:
+  # 预言家：每晚验一人，知道阵营。结果写进本人私有笔记。
+  - id: 查验
+    label: 查验
+    profession: 预言家
+    trigger: turn
+    window: night
+    effect: reveal_camp
+    target: other_alive
+    hint: 每晚一次，无消耗。优先验「最像在带节奏」的人；首夜验谁都可以，别浪费
+
+  # 女巫：双药各一瓶，**同一晚只能用一瓶**（`exclusive_group`）。
+  - id: 解药
+    label: 解药
+    profession: 女巫
+    trigger: turn
+    window: night
+    effect: heal
+    target: any_alive
+    resource: { key: 解药, charges: 1 }
+    exclusive_group: 药
+    hint: 一晚只能用一瓶。惯例首夜救被刀的人（你看得到谁被刀），救错也有信息
+
+  - id: 毒药
+    label: 毒药
+    profession: 女巫
+    trigger: turn
+    window: night
+    effect: poison
+    target: other_alive
+    resource: { key: 毒药, charges: 1 }
+    exclusive_group: 药
+    hint: 毒错等于替狼杀一个好人，且被毒者无遗言。**没有明确证据就不要用**，留着比乱用强
+
+  # 猎人：出局那一刻可以带走一个人；被毒出局不能开枪（标准规则）。
+  - id: 开枪
+    label: 开枪
+    profession: 猎人
+    trigger: death
+    effect: shoot
+    target: other_alive
+    forbidden_if: [poison]
+    hint: 只在出局那一刻用一次。带走你最怀疑的人；没怀疑对象就不发动
+
+  # 狼人自爆（A5）：白天当场出局（不留遗言），并直接进入下一夜——
+  # `flag: burst` 写一个回合标记，世界包用 `break_if: flag_set` 跳过当日剩余阶段。
+  - id: 自爆
+    label: 自爆
+    profession: 狼人
+    trigger: turn
+    window: day
+    effect: self_eliminate
+    target: self
+    flag: burst
+    hint: 自杀式战术：自己立刻出局，换来打断当天投票。**队友还多、局面不紧张时绝对不要用**；8 人板几乎任何时候都不值得

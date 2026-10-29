@@ -1,0 +1,14 @@
+world_id: ironvale
+canonical: 旧灯笼
+template_id: tpl_4661e939
+item:
+  id: tpl_4661e939
+  name: 旧灯笼
+  slot: trinket
+  tier: 1
+  req_level: 1
+  attrs: {}
+  tags: []
+agent_id: chr_p1
+uses: 6
+sessions: 1

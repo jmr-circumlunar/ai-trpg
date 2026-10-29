@@ -1,0 +1,4 @@
+npcs:
+- id: npc_1
+  name: 样例角色
+  goal: 活着

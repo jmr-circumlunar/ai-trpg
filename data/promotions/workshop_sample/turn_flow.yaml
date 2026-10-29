@@ -1,0 +1,66 @@
+﻿# 回合流程。**本文件可以整份删掉** —— 删掉 = 用框架标准流程。
+#
+# 一个阶段 = id（你随便起名）+ kind（7 个通用类型之一）+ 该 kind 的参数。
+# kind 是封闭枚举，世界包不能发明；id 不受校验。
+#
+# 通用 kind：narration / action / collective / apply / check / broadcast / commit
+# 每个 kind 的完整参数表见 README「能力清单」→「阶段种类」。
+#
+# 预设：from: standard（标准跑团）/ from: minimal（极简三阶段）
+from: standard
+
+# ── 预设 A：标准跑团（等价于不写 phases）──────────────────
+phases:
+  - id: scene
+    kind: narration
+  - id: declare
+    kind: action
+    order: dex
+    visibility: previous
+  - id: resolve
+    kind: action
+    judge: true          # 本阶段要判定；judge 系统关闭时整段跳过
+  - id: narrate
+    kind: broadcast
+    source: static
+  - id: commit
+    kind: commit
+
+# ── 预设 B：极简三阶段（换掉上面的 phases）─────────────────
+# from: minimal
+# phases:
+#   - id: scene
+#     kind: narration
+#   - id: declare
+#     kind: action
+#     order: fixed
+#     fixed_sequence: []
+#   - id: narrate
+#     kind: broadcast
+#
+# ── 预设 C：昼夜两套流程（差异全在参数，框架没有「夜晚」概念）──
+# phases:
+#   - id: night                      # ← 这个名字只属于本世界
+#     kind: action
+#     visibility: group              # 只有同组可见
+#     groups:
+#       - { by: camp, value: wolf, visible_to: group, mode: consensus }
+#   - id: dawn
+#     kind: broadcast
+#     source: eliminated_this_turn
+#   - id: discuss
+#     kind: action
+#     visibility: public
+#   - id: vote
+#     kind: collective
+#     rule: plurality
+#     tie: runoff
+#   - id: exile
+#     kind: apply
+#     target: collective_result
+#     effect: eliminate
+#   - id: check_win
+#     kind: check
+#     when: always
+#     break_if: win_decided
+#     repeat: 2

@@ -1,0 +1,8 @@
+# 狼人杀没有装备（systems.equipment = false），这里只留空模板满足必填文件。
+schema_version: 1
+
+items: []
+
+starter:
+  default: []
+  by_origin: {}

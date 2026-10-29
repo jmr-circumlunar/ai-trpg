@@ -1,0 +1,129 @@
+/* 狼人杀 · 深红金主题（世界包自带皮肤，方案 35）
+ *
+ * 约定：世界主题**只覆盖变量与纯样式**，不写行为。框架的基础主题在
+ * `src/styles/theme.css`，这里只把它换成「桌游牌桌」的观感：
+ *   - 底色：酒红 → 墨黑的双层渐变（桌布 + 灯光）
+ *   - 主色：暗金（号位号、标题、强调）
+ *   - 卡面：深红绒布 + 金属描边；出局卡压暗并加「×」质感
+ *
+ * 加载方式：后端 `GET /api/worlds/{id}/theme.css` 原样返回，前端按需 <link> 插入。
+ */
+:root,
+body {
+  --bg: #17090b;
+  --bg-2: #221013;
+  --surface: #2a1417;
+  --surface-2: #361a1e;
+  --line: #5b2b2c;
+  --line-strong: #8a4a3c;
+  --text: #f2e6d8;
+  --dim: #b79a8c;
+  --gold: #d9a441;
+  --gold-soft: #efc97a;
+  --danger: #d9544a;
+  --ok: #7fb87a;
+  --warn: #e0a33c;
+  --r-md: 10px;
+  --r-lg: 16px;
+
+  /* S0-4：世界包**只覆盖 token**，不必重写组件样式。
+     框架样式一律只引用 token（theme.css 的三层：基础色 / 语义色 / 组件色），
+     所以这里改一个变量就能换掉整套观感。 */
+  --accent-warm: #ffd27a;   /* 强调金：时间线里的高亮条目 */
+  --text-strong: #f2e9ff;   /* 强对比文字 */
+}
+
+body {
+  background:
+    radial-gradient(1200px 620px at 50% -10%, rgba(217, 164, 65, 0.16), transparent 62%),
+    radial-gradient(900px 520px at 12% 100%, rgba(150, 32, 40, 0.28), transparent 60%),
+    linear-gradient(160deg, #1b0a0c 0%, #12070a 55%, #0c0507 100%);
+  color: var(--text);
+}
+
+/* 顶栏与状态条：更像桌游台的侧边木框 */
+.topbar {
+  background: linear-gradient(180deg, rgba(58, 24, 26, 0.96), rgba(30, 12, 14, 0.92));
+  border-bottom: 1px solid var(--line-strong);
+}
+
+h1 {
+  color: var(--gold-soft);
+  letter-spacing: .06em;
+}
+
+/* 号位卡（牌桌骨架里每张牌） */
+.agent-card {
+  background:
+    linear-gradient(180deg, rgba(74, 28, 32, 0.96), rgba(38, 16, 19, 0.96));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-md);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 226, 170, 0.08);
+}
+
+.agent-name { color: #f6e7d2; }
+
+/* 号位号：像桌上的铜牌 */
+.seat-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--gold);
+  color: var(--gold-soft);
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+/* 出局：牌面压暗 + 红色描边 */
+.agent-out {
+  border-color: #6a2320;
+  filter: saturate(.55) brightness(.72);
+}
+
+/* 身份牌背（发牌动效里未翻开的状态） */
+.card-back {
+  background:
+    repeating-linear-gradient(45deg, #4a1a1e 0 6px, #3a1216 6px 12px);
+  border: 1px solid var(--gold);
+  border-radius: 8px;
+}
+
+/* 身份牌面翻开后：作为角色卡的背景纹理 */
+.agent-card.identity-flipped {
+  background-image:
+    linear-gradient(180deg, rgba(38, 16, 19, 0.86), rgba(24, 10, 12, 0.9)),
+    radial-gradient(120px 120px at 82% 18%, rgba(217, 164, 65, 0.22), transparent 70%);
+}
+
+/* 按钮与强调色 */
+.btn {
+  background: linear-gradient(180deg, #7a2b25, #5c1c1c);
+  border: 1px solid var(--line-strong);
+  color: #f7e9d6;
+}
+.btn:hover { border-color: var(--gold); }
+.btn-ghost { background: transparent; }
+
+.chip-accent {
+  color: #1a0b06;
+  background: linear-gradient(180deg, var(--gold-soft), var(--gold));
+  border-color: var(--gold);
+}
+
+/* 大厅 / 房间页的世界卡与存档槽 */
+.world-card,
+.save-slot,
+.seat-row {
+  background: linear-gradient(180deg, rgba(58, 24, 28, 0.9), rgba(30, 13, 15, 0.9));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.world-card:hover,
+.save-slot:hover { border-color: var(--gold); }
+
+/* 主持人播报：像旁白字幕 */
+.banner-line { color: #f0dcc0; }
+.banner-turn { color: var(--gold); }

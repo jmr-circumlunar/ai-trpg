@@ -1,0 +1,19 @@
+# 装备模板 + 报到初始装备。
+# tags 必须 ⊆ rules/equipment.yaml: tag_vocab，且每条最多 3 个（C7）。
+# starter 引用的模板 req_level 必须为 1（C14）。
+schema_version: 1
+
+items:
+  - id: item_01
+    name: 旧短刀
+    tags: [blade]          # 必须 ∈ rules/equipment.yaml: tag_vocab（C7），最多 3 个
+    req_level: 1           # 报到装备必须为 1（C14）
+    tier: 1
+    quality: common
+    slots: [main_hand]
+    dc_bonus: {器械: 1}
+    desc: 刃口有细密缺口，但还能用。
+
+starter:
+  default: [item_01]
+  by_origin: {}

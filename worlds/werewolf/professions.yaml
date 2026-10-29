@@ -1,0 +1,64 @@
+# 身份牌。`camp` 会在建卡时写进 CharacterRuntime.camp（阵营是局设定，不可由模型改）。
+# `initial_pool` 与 --players 8 配合：按顺序取 8 个（3 狼 + 预言家 / 女巫 / 猎人 + 2 村民）。
+schema_version: 1
+
+initial_pool:
+  - 狼人
+  - 狼人
+  - 狼人
+  - 预言家
+  - 女巫
+  - 猎人
+  - 村民
+  - 村民
+
+professions:
+  - id: 狼人
+    label: 狼人
+    camp: wolf
+    description: 夜里睁眼的人。白天看起来和其他人没有区别
+    personality: 沉着、擅长把话题引到别人身上
+    private_goal: 活到只剩自己人
+    stats: {str: 12, dex: 11, int: 12, wis: 11, cha: 12}
+    skills: {交涉: 2, 观察: 2}
+    tags: []
+
+  - id: 预言家
+    label: 预言家
+    camp: village
+    description: 每夜能看清一个人
+    personality: 谨慎、话说一半留一半
+    private_goal: 在被刀之前把信息说出去
+    stats: {str: 9, dex: 10, int: 14, wis: 14, cha: 11}
+    skills: {观察: 3, 学识: 2}
+    tags: []
+
+  - id: 女巫
+    label: 女巫
+    camp: village
+    description: 有一瓶解药和一瓶毒药
+    personality: 冷静、记账清楚
+    private_goal: 别把药浪费在错的人身上
+    stats: {str: 9, dex: 11, int: 13, wis: 15, cha: 10}
+    skills: {医疗: 3, 观察: 1}
+    tags: []
+
+  - id: 猎人
+    label: 猎人
+    camp: village
+    description: 出局时能带走一个人
+    personality: 直、记仇
+    private_goal: 死也要拉一个
+    stats: {str: 14, dex: 12, int: 9, wis: 11, cha: 10}
+    skills: {威吓: 2, 观察: 2}
+    tags: []
+
+  - id: 村民
+    label: 村民
+    camp: village
+    description: 什么能力都没有，只有眼睛和嘴
+    personality: 疑心重、跟着感觉走
+    private_goal: 活下去
+    stats: {str: 11, dex: 11, int: 11, wis: 12, cha: 11}
+    skills: {交涉: 1, 观察: 2}
+    tags: []

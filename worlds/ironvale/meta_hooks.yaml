@@ -1,0 +1,20 @@
+# 局外成长声明（meta_hooks）
+#
+# 公开占位世界也有一份：证明「同一份点数，换个世界换套价目表」。
+# 卡塞尔叫「龙血点」，这里叫「铁印」——本质是同一份抽象点数。
+schema_version: 1
+meta:
+  currency: {key: point, label: 铁印, earn_scale: 1}
+
+  earn:
+    - {event: ending, amount: 2, note: 活到收场}
+    - {event: combat_won, amount: 1, note: 打赢了什么东西}
+
+  spend:
+    - {kind: skill, target: 撬锁, cost: 2, max: 3, effect: 撬锁 +1}
+    - {kind: skill, target: 生存, cost: 2, max: 2, effect: 生存 +1}
+    - {kind: skill, target: 追踪, cost: 3, max: 2, effect: 追踪 +1}
+    - {kind: trait, target: trait_scars, cost: 5, max: 3, effect: 留下一道旧疤}
+
+  carry:
+    - {kind: trait, target: trait_scars}

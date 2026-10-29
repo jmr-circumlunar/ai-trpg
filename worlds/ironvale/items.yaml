@@ -82,3 +82,33 @@ items:
     req_level: 3
     attrs: {ward: [2, 3]}
     tags: [arcane]
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {}
+    tags: []
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {}
+    tags: []
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {}
+    tags: []
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {}
+    tags: []
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {}
+    tags: []
+    slot: trinket
+    tier: 1
+    req_level: 1
+    attrs: {}
+    tags: []

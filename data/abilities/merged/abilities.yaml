@@ -1,0 +1,14 @@
+id: extra
+priority: 10
+unlocks:
+- id: u_start
+  requires: []
+- id: u_path_1
+  requires:
+  - u_start
+- id: u_path_2
+  requires:
+  - u_path_1
+- id: u_secret
+  requires:
+  - u_path_2

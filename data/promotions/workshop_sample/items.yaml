@@ -1,0 +1,9 @@
+schema_version: 1
+items:
+- id: itm_1
+  name: 样例道具
+  slot: tool
+starter:
+  default:
+  - item_01
+  by_origin: {}

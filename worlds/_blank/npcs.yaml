@@ -1,0 +1,10 @@
+# NPC 模板。出场时机只能写在 npcs_timeline.yaml（C16 单一来源）。
+npcs: []
+# 示例（取消注释即可用）：
+# npcs:
+#   - id: npc_01
+#     name: 门口的人
+#     role: 看门的
+#     personality: 不耐烦，但记得每个人的脸
+#     goal: 不让任何人上楼
+#     secrets: [楼上其实没人]

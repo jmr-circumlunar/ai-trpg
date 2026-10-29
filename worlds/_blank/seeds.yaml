@@ -1,0 +1,11 @@
+# 事件种子：世界包没有种子就开不了局（C32 内容门槛）。
+# stage_range = [最少幕次, 最多幕次]；title/summary 进 GM prompt 作为「可能发生的事」。
+seeds:
+  - id: seed_01
+    title: 粉笔线
+    summary: 有人在地板上画了一条线，第二天它会移动半尺。
+    stage_range: [1, 4]
+  - id: seed_02
+    title: 多出来的一把钥匙
+    summary: 钥匙串上多了一把没人认领的钥匙，齿口很新。
+    stage_range: [1, 3]
