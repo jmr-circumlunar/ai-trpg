@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>历史局 · AI 跑团</title>
+<style>
+  :root{--bg:#12141a;--panel:#1a1d25;--line:#2a2f3a;--ink:#d8dbe2;--dim:#8b93a3;--gold:#c8a45c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;gap:14px;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{margin:0;font-size:17px;color:var(--gold);letter-spacing:.14em}
+  header .grow{flex:1}
+  a{color:var(--dim);text-decoration:none;font-size:13px}
+  main{max-width:1000px;margin:0 auto;padding:24px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:500}
+  .empty{color:var(--dim);text-align:center;padding:40px}
+  button{background:transparent;color:var(--gold);border:1px solid #4a3d24;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer}
+</style>
+</head>
+<body>
+<header>
+  <h1>历史局</h1>
+  <span class="grow"></span>
+  <a href="/worlds">← 世界</a>
+</header>
+<main>
+  <div id="box" class="empty">加载中…</div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const world = new URLSearchParams(location.search).get("world") || "";
+
+async function load() {
+  const r = await fetch("/api/sessions");
+  if (!r.ok) { $("box").innerHTML = '<div class="empty">读不到会话列表</div>'; return; }
+  const rows = (await r.json()).sessions || [];
+  const mine = world ? rows.filter(s => s.world_id === world) : rows;
+  if (!mine.length) { $("box").innerHTML = '<div class="empty">这个世界还没有历史局</div>'; return; }
+  $("box").className = "";
+  $("box").innerHTML = `<table>
+    <thead><tr><th>世界</th><th>回合</th><th>状态</th><th>结局</th><th>上次游玩</th><th></th></tr></thead>
+    <tbody>${mine.map(s => `<tr>
+      <td>${s.world_id}</td>
+      <td>${s.current_turn || 0}</td>
+      <td>${({running:"进行中",paused:"已暂存",ended:"已结束"})[s.status] || s.status || ""}</td>
+      <td>${s.ending ? (s.ending.summary || s.ending.kind) : "—"}</td>
+      <td>${String(s.updated_at || s.created_at || "").replace("T", " ").slice(0, 16)}</td>
+      <td>${s.status === "ended" ? `<button data-sid="${s.session_id}">看结局</button>`
+                                : `<button data-sid="${s.session_id}">继续</button>`}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+  $("box").querySelectorAll("button[data-sid]").forEach(b => {
+    b.addEventListener("click", () => {
+      location.href = `/play?sid=${encodeURIComponent(b.dataset.sid)}`;
+    });
+  });
+}
+load();
+</script>
+</body>
+</html>

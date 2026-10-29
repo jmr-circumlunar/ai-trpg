@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>GM 配置 · ai-trpg</title>
+<style>
+  :root { --bg:#0f1115; --card:#161a20; --line:#232a33; --text:#e6e6e6; --dim:#8b949e;
+          --ok:#3fb950; --warn:#d29922; --bad:#f85149; --accent:#58a6ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:#12161c; border-bottom:1px solid var(--line);
+           padding:12px 18px; display:flex; gap:16px; align-items:center; }
+  h1 { font-size:15px; margin:0; font-weight:600; letter-spacing:.5px; }
+  header .grow { flex:1; }
+  a { color:var(--accent); text-decoration:none; font-size:13px; }
+  main { padding:18px; max-width:1100px; display:grid; grid-template-columns:1.1fr .9fr; gap:16px; }
+  @media(max-width:980px){ main{grid-template-columns:1fr;} }
+  section { border:1px solid var(--line); border-radius:8px; background:var(--card); }
+  section > h2 { font-size:13px; margin:0; padding:10px 14px; border-bottom:1px solid var(--line);
+                 color:var(--dim); font-weight:600; }
+  .body { padding:14px; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; color:var(--dim); font-size:12px; margin-bottom:5px; }
+  input, select, textarea { width:100%; background:#0e1218; color:var(--text);
+      border:1px solid var(--line); border-radius:6px; padding:8px 10px; font:inherit; }
+  textarea { min-height:74px; resize:vertical; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .hint { color:var(--dim); font-size:11.5px; margin-top:4px; }
+  button { background:var(--accent); color:#05131f; border:none; border-radius:6px;
+           padding:9px 16px; font:inherit; font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  .kv { display:flex; justify-content:space-between; gap:12px; padding:5px 0;
+        border-bottom:1px dashed var(--line); font-size:13px; }
+  .kv:last-child { border-bottom:none; }
+  .kv span:first-child { color:var(--dim); }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:500; }
+  .tag { display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
+         border:1px solid var(--line); color:var(--dim); margin:0 4px 4px 0; }
+  .bar { height:4px; background:#20262e; border-radius:2px; overflow:hidden; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+  #msg { padding:10px 14px; font-size:13px; }
+  .err { color:var(--bad); }
+</style>
+</head>
+<body>
+<header>
+  <h1>GM 配置</h1>
+  <span class="grow"></span>
+  <a href="/">← 回游戏</a>
+  <a href="/characters">角色库</a>
+  <a href="/trace">trace</a>
+</header>
+
+<main>
+  <section>
+    <h2>开局参数</h2>
+    <div class="body">
+      <div class="field">
+        <label>世界包</label>
+        <select id="world"></select>
+        <div class="hint" id="world-hint">—</div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Provider</label>
+          <select id="provider">
+            <option value="auto">auto（真实模型）</option>
+            <option value="mock">mock（离线，不烧 token）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>模型（空 = 用配置默认）</label>
+          <input id="model" placeholder="MiniMax-M3.1-Flash">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>思考深度</label>
+          <select id="effort">
+            <option value="">跟随全局</option>
+            <option value="low">low（快）</option>
+            <option value="medium">medium（默认）</option>
+            <option value="high">high（慢、贵）</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>玩家数</label>
+          <select id="players">
+            <option>2</option><option selected>3</option><option>4</option>
+            <option>5</option><option>6</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>时间点（二期：只能从已解锁的开工）</label>
+        <select id="timeline"></select>
+        <div class="hint" id="timeline-hint">—</div>
+      </div>
+      <div class="field">
+        <label>人类席位（勾选的角色由你操作，其余由 AI 扮演）</label>
+        <div id="human-slots" style="display:flex;gap:14px;flex-wrap:wrap"></div>
+        <div class="hint">轮到你时游戏页会弹输入框；120 秒未提交则本回合由 AI 代打。未勾选的席位仍由 AI 扮演。开局后不可更换。</div>
+      </div>
+      <div class="field">
+        <label>继承上一局（可选：只继承「传闻」，不继承数值与装备）</label>
+        <select id="inherit"><option value="">不继承</option></select>
+      </div>
+      <div class="field">
+        <label>种子（同 seed = 同队伍、同骰序；留空则随机）</label>
+        <input id="seed" placeholder="42">
+      </div>
+      <div class="field">
+        <label>叙事风格覆盖（空 = 用世界包 world.yaml 的 style）</label>
+        <textarea id="style" placeholder="冷峻、克制，少形容词。用具体的物、声音、气味和动作推进。"></textarea>
+      </div>
+      <button id="start">开一局</button>
+      <div id="msg"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>局外成长（三期）</h2>
+    <div class="body">
+      <div class="field">
+        <label>角色卡（成长花在这张卡上）</label>
+        <select id="meta-char"></select>
+        <div class="hint">点数跨世界累计；能买什么、多少钱由当前世界的价目表决定</div>
+      </div>
+      <div id="meta-info" class="hint">加载中…</div>
+      <div id="meta-spend" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>物品晋升候选（三期）</h2>
+    <div class="body">
+      <div id="promote-list" class="hint">加载中…</div>
+      <div class="hint">达到使用次数阈值的道具会出现在这里；点「生成待确认补丁」只写 data/promotions/（不改世界包），人工执行 <code>python tools\apply_promotions.py --apply</code> 才生效</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>世界概览</h2>
+    <div class="body" id="world-info"><div class="hint">加载中…</div></div>
+  </section>
+
+  <section style="grid-column:1/-1">
+    <h2>出身与身份（三层职业世界才有）</h2>
+    <div class="body" id="identity"><div class="hint">—</div></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const QS = new URLSearchParams(location.search);
+const STORE = "ai-trpg.gm";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let worlds = [];
+
+function save() {
+  const cfg = {
+    world: $("world").value, provider: $("provider").value, model: $("model").value,
+    effort: $("effort").value, players: $("players").value, seed: $("seed").value,
+    style: $("style").value, timeline: $("timeline").value, inherit: $("inherit").value,
+    humans: [...document.querySelectorAll("#human-slots input:checked")].map(i => i.value),
+  };
+  localStorage.setItem(STORE, JSON.stringify(cfg));
+  return cfg;
+}
+
+function restore() {
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) {}
+  if (cfg.provider) $("provider").value = cfg.provider;
+  if (cfg.model) $("model").value = cfg.model;
+  if (cfg.effort !== undefined) $("effort").value = cfg.effort;
+  if (cfg.players) $("players").value = cfg.players;
+  if (cfg.seed) $("seed").value = cfg.seed;
+  if (cfg.style) $("style").value = cfg.style;
+  return cfg;
+}
+
+async function loadWorlds() {
+  const r = await fetch("/api/worlds");
+  const data = await r.json();
+  worlds = data.worlds;
+  $("world").innerHTML = worlds.map(w => `<option value="${w.id}">${esc(w.name)}（${esc(w.id)}）</option>`).join("");
+  const want = QS.get("world");
+  if (want && worlds.some(w => w.id === want)) $("world").value = want;
+  renderWorld();
+}
+
+function renderWorld() {
+  const w = worlds.find(x => x.id === $("world").value);
+  if (!w) return;
+  $("world-hint").textContent = w.tone || "";
+  $("world-info").innerHTML = `
+    <div class="kv"><span>世界</span><span>${esc(w.name)} · ${esc(w.id)}</span></div>
+    <div class="kv"><span>era</span><span>${w.eras.map(e => esc(e.label)).join(" / ")}</span></div>
+    <div class="kv"><span>region</span><span>${w.regions.map(esc).join(" / ")}</span></div>
+    <div class="kv"><span>内容量</span><span>种子 ${w.counts.seeds} · 装备 ${w.counts.items} · NPC ${w.counts.npcs}</span></div>
+    <div class="kv"><span>调用方式</span><span>每回合：场景 1 次 + 每个角色 1 次 + 叙事 1 次</span></div>`;
+  renderTimeline(w);
+  renderSlots();
+  loadIdentity();
+}
+
+function renderTimeline(w) {
+  const list = (w.timelines || []).filter(t => t.available);
+  const sel = $("timeline");
+  const keep = sel.value;
+  sel.innerHTML = list.map(t => `<option value="${t.id}">${esc(t.label)}（${esc(t.era)}）</option>`).join("");
+  if (keep && list.some(t => t.id === keep)) sel.value = keep;
+  else if (w.default_timeline && list.some(t => t.id === w.default_timeline)) sel.value = w.default_timeline;
+  const locked = (w.timelines || []).filter(t => !t.available).map(t => t.label);
+  const base = list.length
+    ? `可开局 ${list.length} 个时间点` + (locked.length ? `；未解锁：${locked.join("、")}` : "")
+    : "该世界没有时间线配置（按默认开局）";
+  const cur = list.find(t => t.id === sel.value);
+  $("timeline-hint").textContent = cur && cur.premise ? `${base}｜${cur.premise}` : base;
+  renderSlots();
+}
+
+function renderSlots() {
+  const n = Number($("players").value) || 3;
+  const box = $("human-slots");
+  const checked = new Set([...box.querySelectorAll("input:checked")].map(i => i.value));
+  box.innerHTML = Array.from({ length: n }, (_, i) => {
+    const cid = `chr_p${i + 1}`;
+    const on = checked.has(cid) ? " checked" : "";
+    return `<label style="display:flex;gap:6px;align-items:center;font-size:13px">
+      <input type="checkbox" value="${cid}"${on}> 角色${i + 1}</label>`;
+  }).join("");
+}
+
+async function loadIdentity() {
+  const wid = $("world").value;
+  try {
+    const r = await fetch(`/api/worlds/${wid}/origins`);
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    if (!data.origins || !data.origins.length) {
+      $("identity").innerHTML = '<div class="hint">这个世界用单层职业（professions.yaml），没有出身/身份阶梯。</div>';
+      return;
+    }
+    const total = data.origins.reduce((s, o) => s + (o.weight || 0), 0) || 1;
+    const originRows = data.origins.map(o => {
+      const pct = Math.round(100 * (o.weight || 0) / total);
+      return `<tr>
+        <td>${esc(o.label)}</td>
+        <td style="width:120px"><div class="bar"><i style="width:${pct}%"></i></div></td>
+        <td>${pct}%</td>
+        <td>${esc(o.personality || "")}</td>
+      </tr>`;
+    }).join("");
+    const pathRows = data.paths.map(p => {
+      const req = p.requirements || {};
+      const bits = [];
+      if (req.stage_min) bits.push(`幕次≥${req.stage_min}`);
+      if (req.stats_min) bits.push(Object.entries(req.stats_min).map(([k, v]) => `${k}≥${v}`).join("、"));
+      if (req.min_grade) bits.push(`血统≥${esc(req.min_grade)}`);
+      if (req.requires_path) bits.push(`需先为${req.requires_path.map(esc).join("/")}`);
+      if (req.event) bits.push(`叙事条件：${esc(req.event)}`);
+      return `<tr>
+        <td>${esc(p.label)}${p.default ? ' <span class="tag">默认</span>' : ""}</td>
+        <td>${(p.granted_by || []).map(esc).join("、")}</td>
+        <td>${bits.join("；") || "—"}</td>
+        <td>${Object.keys(p.grants || {}).length ? esc(JSON.stringify(p.grants)) : "—"}</td>
+      </tr>`;
+    }).join("");
+
+    $("identity").innerHTML = `
+      <div class="hint" style="margin-bottom:10px">出身按权重抽（同 seed 可复现），天赋抽 1~2 个，身份默认「${esc(data.path_default)}」。</div>
+      <table>
+        <thead><tr><th>出身</th><th>权重</th><th>占比</th><th>性格</th></tr></thead>
+        <tbody>${originRows}</tbody>
+      </table>
+      <div class="hint" style="margin:14px 0 8px">身份阶梯（只能由剧情授予，代码校验门槛）</div>
+      <table>
+        <thead><tr><th>身份</th><th>授予方</th><th>门槛</th><th>授予内容</th></tr></thead>
+        <tbody>${pathRows}</tbody>
+      </table>`;
+  } catch (_) {
+    $("identity").innerHTML = '<div class="hint">读不到出身/身份数据。</div>';
+  }
+}
+
+async function start() {
+  const cfg = save();
+  $("start").disabled = true;
+  $("msg").textContent = "开局中…";
+  try {
+    const r = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        world: cfg.world,
+        players: Number(cfg.players),
+        provider: cfg.provider,
+        model: cfg.model || null,
+        reasoning_effort: cfg.effort || null,
+        seed: cfg.seed || "42",
+        style: cfg.style || "",
+        timeline: cfg.timeline || null,
+        human_ids: cfg.humans || [],
+        inherit_from: cfg.inherit || null,
+      }),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const s = await r.json();
+    location.href = `/?sid=${encodeURIComponent(s.session_id)}&provider=${encodeURIComponent(cfg.provider)}`;
+  } catch (e) {
+    $("msg").innerHTML = `<span class="err">开局失败：${esc(e.message)}</span>`;
+  } finally {
+    $("start").disabled = false;
+  }
+}
+
+async function loadMeta() {
+  const wid = $("world").value;
+  try {
+    const cr = await fetch("/api/characters");
+    const cd = cr.ok ? (await cr.json()).characters || [] : [];
+    // 同名只留最新的一个（角色库可能有同名卡），并显示 id 尾 4 位以便区分
+    const mine = cd.filter(c => !c.world_id || c.world_id === wid);
+    const seen = new Set();
+    const cards = mine.filter(c => {
+      if (seen.has(c.name)) return false;
+      seen.add(c.name);
+      return true;
+    });
+    $("meta-char").innerHTML = cards.map(c =>
+      `<option value="${c.id}">${esc(c.name)}·${esc(c.id.slice(-4))}</option>`).join("")
+      || '<option value="">（这个世界还没有角色卡）</option>';
+
+    const r = await fetch(`/api/meta?world=${encodeURIComponent(wid)}`);
+    if (!r.ok) { $("meta-info").textContent = "读不到局外成长数据"; return; }
+    const d = await r.json();
+    $("meta-info").textContent = `${d.currency.label} ${d.balance}　（点数跨世界累计，价目表按世界）`;
+    $("meta-spend").innerHTML = (d.spend || []).map(item => {
+      const dis = !item.ok || !item.affordable ? "disabled" : "";
+      const why = item.ok ? "" : `　${item.why || ""}`;
+      return `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap">
+        <span style="min-width:170px">${esc(item.kind)}：${esc(item.target)}</span>
+        <span class="hint">${esc(item.effect || "")}${esc(why)}</span>
+        <span style="flex:1"></span>
+        <span class="hint">${item.cost} ${esc(d.currency.label)}</span>
+        <button data-kind="${esc(item.kind)}" data-target="${esc(item.target)}" ${dis}
+          style="padding:4px 10px;font-size:12px">购买</button>
+      </div>`;
+    }).join("") || '<div class="hint">这个世界还没有配置价目表（worlds/&lt;id&gt;/meta_hooks.yaml）</div>';
+  } catch (e) {
+    $("meta-info").textContent = "加载失败：" + e.message;
+  }
+}
+
+async function loadCandidates() {
+  try {
+    const r = await fetch(`/api/items/candidates?world=${encodeURIComponent($("world").value)}`);
+    if (!r.ok) { $("promote-list").textContent = "读不到候选"; return; }
+    const d = await r.json();
+    const rows = d.candidates || [];
+    $("promote-list").innerHTML = rows.length
+      ? rows.map(c => `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <span>${esc(c.canonical)}</span>
+          <span class="hint">用 ${c.uses} 次 · ${c.sessions} 局 · 可升为 ${c.level === "template" ? "世界模板" : "装备实例"}</span>
+          <span style="flex:1"></span>
+          <button data-canonical="${esc(c.canonical)}" data-level="${esc(c.level)}"
+            style="padding:4px 10px;font-size:12px">生成待确认补丁</button>
+        </div>`).join("")
+      : '<div class="hint">暂无达到阈值的道具（用得越多越容易被提升）</div>';
+  } catch (e) {
+    $("promote-list").textContent = "加载失败：" + e.message;
+  }
+}
+
+document.addEventListener("click", async (ev) => {
+  const buy = ev.target.closest("button[data-kind]");
+  if (buy) {
+    const cid = $("meta-char").value;
+    if (!cid) { $("meta-info").textContent = "先选一张角色卡"; return; }
+    const r = await fetch("/api/meta/spend", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        world: $("world").value, character_id: cid,
+        kind: buy.dataset.kind, target: buy.dataset.target,
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) { $("meta-info").textContent = "购买失败：" + (data.detail || "未知原因"); return; }
+    $("meta-info").textContent = `已购买：${data.applied || ""}（余额 ${data.balance}）`;
+    loadMeta();
+    return;
+  }
+  const pro = ev.target.closest("button[data-canonical]");
+  if (pro) {
+    const r = await fetch("/api/items/promote", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        world: $("world").value, canonical: pro.dataset.canonical,
+        tier: pro.dataset.level === "template" ? 2 : 1, slot: "trinket", tags: [],
+      }),
+    });
+    const data = await r.json().catch(() => ({}));
+    $("promote-list").textContent = r.ok
+      ? `已生成待确认补丁：${data.pending}（${data.template_id}）—— 人工执行 tools/apply_promotions.py --apply 才写进世界包`
+      : "生成失败：" + (data.detail || "未知原因");
+    loadCandidates();
+  }
+});
+
+$("world").addEventListener("change", () => { save(); renderWorld(); loadMeta(); loadCandidates(); });
+$("timeline").addEventListener("change", save);
+$("inherit").addEventListener("change", save);
+$("players").addEventListener("change", () => { save(); renderSlots(); });
+
+async function loadPastSessions() {
+  try {
+    const r = await fetch("/api/sessions");
+    if (!r.ok) return;
+    const data = await r.json();
+    const rows = (data.sessions || []).slice(0, 20);
+    // 同名局只留最新的一条，避免下拉里堆几十条一模一样的
+    const seen = new Set();
+    const uniq = rows.filter(s => {
+      const key = `${s.name}|${s.world_id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    $("inherit").innerHTML = '<option value="">不继承</option>' +
+      uniq.map(s => {
+        const e = s.ending;
+        const tail = e
+          ? `　【${e.kind === "wipe" ? "全灭" : "已结束"}：${esc(e.summary || "")}】`
+          : "　（未结算）";
+        const sid = String(s.session_id);
+        return `<option value="${sid}">${esc(s.name || sid)} · ${esc(s.world_id)} · ${s.turns || 0} 回合 · ${esc(sid.slice(-4))}${tail}</option>`;
+      }).join("");
+    restoreInherit();
+  } catch (_) {}
+}
+
+function restoreInherit() {
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem(STORE) || "{}"); } catch (_) {}
+  if (cfg.inherit && [...$("inherit").options].some(o => o.value === cfg.inherit)) {
+    $("inherit").value = cfg.inherit;
+  }
+}
+["provider", "model", "effort", "players", "seed", "style"].forEach(id =>
+  $(id).addEventListener("change", save));
+$("start").addEventListener("click", start);
+
+restore();
+loadWorlds().then(() => {
+  const cfg = restore();
+  if (cfg.world && worlds.some(w => w.id === cfg.world)) { $("world").value = cfg.world; }
+  renderWorld();
+  if (cfg.timeline && [...$("timeline").options].some(o => o.value === cfg.timeline)) {
+    $("timeline").value = cfg.timeline;
+  }
+  if (Array.isArray(cfg.humans) && cfg.humans.length) {
+    [...document.querySelectorAll("#human-slots input")].forEach(i => {
+      i.checked = cfg.humans.includes(i.value);
+    });
+  }
+  loadPastSessions();
+  loadMeta();
+  loadCandidates();
+});
+</script>
+</body>
+</html>

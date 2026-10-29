@@ -1,0 +1,19 @@
+{
+  "name": "ai-trpg-web",
+  "private": true,
+  "version": "0.7.0",
+  "type": "module",
+  "description": "AI跑团前端：Vue3 + Vite。构建产物输出到 static/dist（由 pages.py 按存在性选用）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.4.21"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.6.2",
+    "vite": "^4.5.3"
+  }
+}

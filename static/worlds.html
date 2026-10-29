@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>选择世界 · AI 跑团</title>
+<style>
+  :root{--bg:#12141a;--panel:#1a1d25;--line:#2a2f3a;--ink:#d8dbe2;--dim:#8b93a3;--gold:#c8a45c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{margin:0;font-size:17px;letter-spacing:.14em;color:var(--gold);font-weight:600}
+  header .grow{flex:1}
+  a{color:var(--dim);text-decoration:none;font-size:13px}
+  main{max-width:1100px;margin:0 auto;padding:24px;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+  .card h2{margin:0 0 6px;font-size:16px}
+  .tone{color:var(--dim);font-size:13px;min-height:44px}
+  .open{margin:10px 0;padding:8px 10px;border:1px dashed #4a3d24;border-radius:8px;font-size:13px;color:#d9c9a3}
+  .row{display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  button{background:var(--gold);color:#1a1206;border:0;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+  button.ghost{background:transparent;color:var(--dim);border:1px solid var(--line)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .empty{color:var(--dim);text-align:center;padding:40px}
+  .err{color:#b5544a}
+</style>
+</head>
+<body>
+<header>
+  <h1>选择一个世界</h1>
+  <span class="grow"></span>
+  <a href="/characters">角色库</a>
+  <a href="/gm">幕后配置</a>
+  <a href="/api/logout" id="logout">退出</a>
+</header>
+<main id="list"><div class="empty">加载中…</div></main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function fmtTime(s) {
+  if (!s) return "";
+  return s.replace("T", " ").slice(0, 16);
+}
+
+async function load() {
+  let data;
+  try {
+    const r = await fetch("/api/me/worlds");
+    if (!r.ok) throw new Error(r.status);
+    data = await r.json();
+  } catch (e) {
+    $("list").innerHTML = `<div class="empty err">读不到世界列表（${e.message}）</div>`;
+    return;
+  }
+  const worlds = data.worlds || [];
+  if (!worlds.length) {
+    $("list").innerHTML = '<div class="empty">还没有可用的世界包。<br>把世界放到 worlds/ 目录即可。</div>';
+    return;
+  }
+  $("list").innerHTML = worlds.map(w => {
+    const open = w.open;
+    const openHtml = open
+      ? `<div class="open">进行中：第 ${open.current_turn} 回合 · ${open.status === "paused" ? "已暂存" : "进行中"}<br>上次 ${fmtTime(open.updated_at)}</div>`
+      : "";
+    return `<div class="card">
+      <h2>${w.name}</h2>
+      <div class="tone">${w.tone || ""}</div>
+      ${openHtml}
+      <div class="row">
+        ${open ? `<button data-act="continue" data-sid="${open.session_id}">继续这一局</button>` : ""}
+        <button class="${open ? "ghost" : ""}" data-act="new" data-world="${w.id}">${open ? "开新局" : "开一局"}</button>
+        <button class="ghost" data-act="history" data-world="${w.id}">历史局 ${w.history || 0}</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  $("list").querySelectorAll("button[data-act]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const act = btn.dataset.act;
+      if (act === "continue") {
+        location.href = `/play?sid=${encodeURIComponent(btn.dataset.sid)}`;
+        return;
+      }
+      if (act === "history") {
+        location.href = `/archive?world=${encodeURIComponent(btn.dataset.world)}`;
+        return;
+      }
+      // 开新局：有进行中局时先确认「保存并退出」
+      const card = btn.closest(".card");
+      const sid = card.querySelector("button[data-act=continue]")?.dataset.sid;
+      if (sid) {
+        const ok = confirm("这个世界的上一局还没结束。\n先「保存并退出」它，再开新局？");
+        if (!ok) return;
+        const pr = await fetch(`/api/sessions/${sid}/pause`, { method: "POST" });
+        if (!pr.ok) { alert("暂存失败：" + (await pr.text())); return; }
+      }
+      location.href = `/lobby?world=${encodeURIComponent(btn.dataset.world)}`;
+    });
+  });
+}
+
+$("logout").addEventListener("click", async (ev) => {
+  ev.preventDefault();
+  await fetch("/api/logout", { method: "POST" });
+  location.href = "/login";
+});
+
+load();
+</script>
+</body>
+</html>

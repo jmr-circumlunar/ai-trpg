@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>trace · ai-trpg</title>
+<style>
+  :root { --bg:#0f1115; --card:#161a20; --line:#232a33; --text:#e6e6e6; --dim:#8b949e;
+          --ok:#3fb950; --warn:#d29922; --bad:#f85149; --accent:#58a6ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+         font:14px/1.6 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  header { position:sticky; top:0; z-index:5; background:#12161c; border-bottom:1px solid var(--line);
+           padding:12px 18px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  h1 { font-size:15px; margin:0; font-weight:600; letter-spacing:.5px; }
+  .meta { color:var(--dim); font-size:12px; }
+  .meta b { color:var(--text); font-weight:600; }
+  main { padding:16px 18px 60px; max-width:1180px; }
+  .turn { border:1px solid var(--line); border-radius:8px; background:var(--card); margin-bottom:14px; }
+  .turn > .head { padding:10px 14px; border-bottom:1px solid var(--line);
+                  display:flex; gap:12px; align-items:baseline; }
+  .turn > .head .no { color:var(--accent); font-weight:600; }
+  .scene { padding:10px 14px; color:#cfd6e0; border-bottom:1px solid var(--line); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 14px; vertical-align:top; font-size:13px;
+           border-bottom:1px solid var(--line); }
+  th { color:var(--dim); font-weight:500; font-size:12px; }
+  tr:last-child td { border-bottom:none; }
+  .who { white-space:nowrap; font-weight:600; }
+  .dice { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:var(--dim); }
+  .dice b { color:var(--text); }
+  .tag { display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
+         border:1px solid var(--line); color:var(--dim); margin-right:4px; }
+  .ok { color:var(--ok); } .warn { color:var(--warn); } .bad { color:var(--bad); }
+  .think { color:var(--dim); font-style:italic; }
+  .block { padding:8px 14px; border-top:1px dashed var(--line); font-size:12.5px; }
+  .block .k { color:var(--dim); margin-right:8px; }
+  section { border:1px solid var(--line); border-radius:8px; background:var(--card);
+            margin-bottom:14px; }
+  section > h2 { font-size:13px; margin:0; padding:10px 14px; border-bottom:1px solid var(--line);
+                 color:var(--dim); font-weight:600; }
+  section .body { padding:10px 14px; }
+  code { font-family:ui-monospace,Consolas,monospace; font-size:12px; color:#9cdcfe; }
+  .empty { color:var(--dim); padding:18px; text-align:center; }
+  a { color:var(--accent); text-decoration:none; }
+  .bar { width:120px; height:5px; background:#20262e; border-radius:3px; overflow:hidden;
+         display:inline-block; vertical-align:middle; margin-left:6px; }
+  .bar i { display:block; height:100%; background:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>trace</h1>
+  <span class="meta">会话 <b id="sid">—</b></span>
+  <span class="meta" id="status"></span>
+  <span class="meta" id="model"></span>
+  <span class="meta" id="usage"></span>
+  <span style="flex:1"></span>
+  <a href="/">← 回游戏</a>
+  <a href="/gm">GM 配置</a>
+  <a href="/characters">角色库</a>
+</header>
+<main>
+  <section>
+    <h2>召回与导演</h2>
+    <div class="body" id="meta-log"><span class="empty">加载中…</span></div>
+  </section>
+  <div id="turns"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const sid = new URLSearchParams(location.search).get("sid");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function outcomeClass(o) {
+  if (!o) return "";
+  if (o.startsWith("crit")) return "ok";
+  if (o.startsWith("success")) return "ok";
+  if (o.startsWith("fail_forward")) return "warn";
+  return "bad";
+}
+
+function diceFor(dice, turn, actorId) {
+  const rows = dice.filter(d => d.turn === turn && d.actor_id === actorId);
+  if (!rows.length) return '<span class="dice">—</span>';
+  return rows.map(d => {
+    const rolls = (d.rolls || []).join(",");
+    return `<span class="dice">${esc(d.expr)} <b>[${esc(rolls)}]</b> = ${d.total}` +
+           ` vs DC ${d.dc} <span class="${outcomeClass(d.outcome)}">${esc(d.outcome)}</span>` +
+           ` <span style="opacity:.6">${esc(d.rng_state)}</span></span>`;
+  }).join("<br>");
+}
+
+function renderTurn(t, idx, dice) {
+  const n = t.actors.length;
+  const rows = t.actors.map((cid, i) => `
+    <tr>
+      <td class="who">${esc(cid)}</td>
+      <td>${diceFor(dice, t.turn, cid)}</td>
+      <td>${esc(t.outcomes[i] || "")}</td>
+      <td>
+        <div class="think">心中：${esc(t.thoughts[i] || "")}</div>
+        <div>${esc(t.actions[i] || "")}</div>
+      </td>
+      <td>${esc(t.narration[i] || "")}</td>
+    </tr>`).join("");
+
+  const extras = [];
+  if ((t.loot || []).length) {
+    extras.push(`<div class="block"><span class="k">战利品</span>${t.loot.map(l =>
+      `<span class="tag">${esc(l.name)} · tier${l.tier} ${esc(l.quality)}${l.attrs && Object.keys(l.attrs).length ? " · " + esc(JSON.stringify(l.attrs)) : ""}</span>`).join("")}</div>`);
+  }
+  if ((t.combat || []).length) {
+    extras.push(`<div class="block"><span class="k">战斗</span>${t.combat.map(c =>
+      `<span class="tag">${esc(c.kind)}${c.actor ? "·" + esc(c.actor) : ""}${c.target ? "→" + esc(c.target) : ""}${c.damage ? " −" + c.damage : ""}${c.killed ? " 击杀" : ""}${c.note ? " " + esc(c.note) : ""}</span>`).join("")}</div>`);
+  }
+  if ((t.deaths || []).length) {
+    extras.push(`<div class="block"><span class="k">死亡</span><span class="bad">${t.deaths.map(d => esc(d.char_id)).join("、")}</span></div>`);
+  }
+  if ((t.path_changes || []).length) {
+    extras.push(`<div class="block"><span class="k">身份变更</span>${t.path_changes.map(p =>
+      `<span class="tag">${esc(p.char_id)} → ${esc(p.label || p.path)}${p.grants && Object.keys(p.grants.skills || {}).length ? " · " + esc(JSON.stringify(p.grants.skills)) : ""}</span>`).join("")}</div>`);
+  }
+  if ((t.rejected || []).length) {
+    extras.push(`<div class="block"><span class="k">被拒</span><span class="bad">${esc(t.rejected.join("; "))}</span></div>`);
+  }
+
+  return `
+  <div class="turn">
+    <div class="head">
+      <span class="no">第 ${t.turn} 回合</span>
+      <span class="meta">${n} 名行动者</span>
+      <span class="meta">${t.elapsed_ms || 0} ms（决策 ${t.declare_ms || 0} ms）</span>
+    </div>
+    <div class="scene">${esc(t.scene)}</div>
+    <table>
+      <thead><tr><th>角色</th><th>骰子</th><th>结果</th><th>行动</th><th>叙事</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" class="empty">本回合无人行动</td></tr>'}</tbody>
+    </table>
+    ${extras.join("")}
+  </div>`;
+}
+
+function renderMeta(trace) {
+  const u = trace.usage || {};
+  const recall = trace.recall || [];
+  const director = trace.director || [];
+  const seeds = trace.seeds || [];
+
+  const parts = [];
+  parts.push(`<div class="meta">LLM 调用 <b>${u.calls || 0}</b> · in ${u.in || 0} · out ${u.out || 0} · 失败 ${u.fail || 0} · 重试 ${u.retry || 0}/${u.net_retry || 0}</div>`);
+
+  if (director.length) {
+    parts.push(`<div style="margin-top:8px"><span class="k">导演</span>` +
+      director.map(d => `<span class="tag">T${d.turn ?? 0} ${esc(d.source || "")}${d.quests ? " · " + esc((d.quests || []).join(" / ")) : ""}${d.advance_stage ? " · 推幕" : ""}</span>`).join("") + `</div>`);
+  }
+  if (seeds.length) {
+    parts.push(`<div style="margin-top:8px"><span class="k">抽到的种子</span>` +
+      seeds.map(s => `<span class="tag">${esc(s.id)}${s.type ? " · " + esc(s.type) : ""}</span>`).join("") + `</div>`);
+  }
+  const reasoning = trace.reasoning || [];
+  if (reasoning.length) {
+    parts.push(`<div style="margin-top:10px"><span class="k">推理链（只在幕后可见）</span>` +
+      reasoning.slice(-6).map((r, i) =>
+        `<details style="margin-top:4px"><summary class="meta">#${i + 1} ${esc(r.task || "")} · ${r.chars || 0} 字</summary>
+         <div class="meta" style="white-space:pre-wrap;margin-top:4px">${esc((r.text || "").slice(0, 1200))}</div>
+         </details>`).join("") + `</div>`);
+  }
+
+  if (recall.length) {
+    const rows = recall.slice(-12).map(r => `
+      <tr>
+        <td class="who">${esc(r.char_id)}</td>
+        <td>${r.turn}</td>
+        <td>${esc(r.query)}</td>
+        <td>${(r.items || []).map(i => `<span class="tag">${esc(i.source)} ${i.score} · ${esc(i.text)}</span>`).join("") || '<span class="meta">没召回到</span>'}</td>
+      </tr>`).join("");
+    parts.push(`<table style="margin-top:10px">
+      <thead><tr><th>角色</th><th>回合</th><th>查询</th><th>命中</th></tr></thead>
+      <tbody>${rows}</tbody></table>`);
+  } else {
+    parts.push(`<div class="meta" style="margin-top:8px">本局没有调用过 recall（正常：记忆是 tool，不是自动注入）</div>`);
+  }
+  $("meta-log").innerHTML = parts.join("");
+}
+
+async function load() {
+  if (!sid) { $("meta-log").innerHTML = '<span class="empty">缺少 ?sid= 参数</span>'; return; }
+  $("sid").textContent = sid;
+  const res = await fetch(`/api/sessions/${sid}/trace`);
+  if (!res.ok) { $("meta-log").innerHTML = `<span class="empty">读不到 trace：${res.status}</span>`; return; }
+  const trace = await res.json();
+
+  $("status").textContent = trace.status === "ended" ? "已结束" : "进行中";
+  const u = trace.usage || {};
+  $("model").innerHTML = `模型 <b>${esc(u.model || "mock")}</b>`;
+  $("usage").innerHTML = `回合 <b>${trace.turns.length}</b> · 骰子 <b>${(trace.dice || []).length}</b>`;
+
+  renderMeta(trace);
+  $("turns").innerHTML = trace.turns.length
+    ? trace.turns.map((t, i) => renderTurn(t, i, trace.dice || [])).join("")
+    : '<div class="empty">还没有回合。回游戏页推进一回合再看。</div>';
+}
+
+load();
+</script>
+</body>
+</html>

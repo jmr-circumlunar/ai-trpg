@@ -81,12 +81,69 @@
         border-top-color:var(--gold); border-radius:50%; animation:r .8s linear infinite;
         vertical-align:-2px; margin-right:6px}
   @keyframes r{to{transform:rotate(360deg)}}
-  @media(max-width:900px){ main{grid-template-columns:1fr} aside{order:2} }
+  /* 角色档案抽屉：点角色卡打开，数据全来自已有结构 */
+  #profile-drawer{
+    position:fixed; top:0; right:0; width:min(460px,92vw); height:100vh; overflow-y:auto;
+    background:#151821; border-left:1px solid var(--line); padding:18px 20px;
+    transform:translateX(102%); transition:transform .22s ease; z-index:50;
+  }
+  #profile-drawer.open{transform:translateX(0)}
+  #profile-drawer h3{margin:0 0 4px;font-size:16px;color:var(--gold)}
+  #profile-drawer h4{margin:16px 0 6px;font-size:12px;letter-spacing:.12em;color:var(--dim)}
+  #profile-drawer .row{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:3px 0;border-bottom:1px dashed #232936}
+  #profile-drawer .ev{font-size:12.5px;color:#aab2c0;padding:4px 0;border-bottom:1px dashed #232936}
+  #profile-drawer .ev b{color:#d8dbe2;font-weight:600}
+  #pd-close{float:right;background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:6px;padding:4px 10px;cursor:pointer}
+  .profile-link{cursor:pointer}
+  .profile-link:hover{border-color:#4a3d24}
+  /* 结构化选项：点一下就能做，不用打字 */
+  .opts{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px}
+  .opt{
+    background:#1e2430;color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer;
+  }
+  .opt:hover{border-color:var(--gold);color:#f0e2c4}
+  .opt .hint{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}
+  /* 思考框：可折叠，默认收起，想看的人自己点开 */
+  details.think{margin-top:6px}
+  details.think summary{cursor:pointer;color:var(--dim);font-size:12.5px;list-style:none}
+  details.think summary::-webkit-details-marker{display:none}
+  details.think summary::before{content:"▸ ";}
+  details.think[open] summary::before{content:"▾ ";}
+  details.think p{color:#9aa3b2;font-size:13px;margin:4px 0 0}
+  /* 顶栏状态条：一行看完「我在哪、什么时候、局势如何」 */
+  #statusbar{
+    display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto;
+    padding:8px 22px; background:#151821; border-bottom:1px solid var(--line);
+    font-size:12.5px; color:var(--ink); white-space:nowrap;
+  }
+  #statusbar .chip{
+    border:1px solid var(--line); border-radius:20px; padding:2px 10px; color:#aab2c0;
+  }
+  #statusbar .chip.world{color:var(--gold); border-color:#4a3d24}
+  /* 推进进度条 */
+  #progress-wrap{display:none; margin-top:12px}
+  #progress{height:5px; background:#242938; border-radius:3px; overflow:hidden}
+  #progress > i{display:block; height:100%; width:0; background:var(--gold); transition:width .25s linear}
+  #pbar-label{font-size:12px; color:var(--dim); margin-top:5px; display:block}
+  /* 本回合变化卡 */
+  .changes{margin-top:10px;border:1px solid #3a3324;border-radius:8px;padding:8px 10px;background:#1b1a14}
+  .changes .chdr{font-size:11.5px;letter-spacing:.12em;color:var(--gold);margin-bottom:4px}
+  /* 移动端：单列 + 抽屉铺满 + 选项竖排（手机上三栏+打字机本来没法用） */
+  @media(max-width:900px){
+    main{grid-template-columns:1fr}
+    aside{order:2}
+    #statusbar{padding:8px 14px;font-size:12px}
+    #profile-drawer{width:100vw}
+    .opts{flex-direction:column}
+    .opt{width:100%;text-align:left}
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>IRONVALE</h1>
+  <span class="sub" id="hdr-note"></span>
   <span class="sub" id="hdr-sub">未开局</span>
   <span class="grow"></span>
   <label class="sub">世界
@@ -109,8 +166,12 @@
     </select>
   </label>
   <a class="btn" href="/characters" style="background:transparent;color:#8b93a3;border:1px solid #2a2f3a;border-radius:6px;padding:7px 12px;font-size:13px;text-decoration:none">角色</a>
+  <a class="btn" href="/gm" style="background:transparent;color:#8b93a3;border:1px solid #2a2f3a;border-radius:6px;padding:7px 12px;font-size:13px;text-decoration:none">GM</a>
+  <a class="btn" id="trace-link" href="/trace" style="background:transparent;color:#8b93a3;border:1px solid #2a2f3a;border-radius:6px;padding:7px 12px;font-size:13px;text-decoration:none">trace</a>
   <button id="new">开一局</button>
 </header>
+
+<div id="statusbar"><span class="chip">未开局</span></div>
 
 <main>
   <aside>
@@ -119,12 +180,51 @@
   </aside>
 
   <section>
+    <!-- 二期：人类席位输入面板（轮到你时出现在叙事流上方） -->
+    <div id="human-panel" style="display:none;margin-bottom:14px;border:1px solid #6b4a2f;border-radius:8px;padding:12px;background:#1b1512">
+      <div style="display:flex;gap:10px;align-items:baseline;margin-bottom:6px">
+        <b id="hp-who" style="color:#e8a87c">轮到你</b>
+        <span class="sub" id="hp-countdown"></span>
+        <span style="flex:1"></span>
+        <span class="sub" id="hp-state"></span>
+        <button id="hp-ghost" style="background:transparent;color:#8b93a3;border:1px solid #2a2f3a;border-radius:6px;padding:6px 10px;font-size:12px;cursor:pointer">交给 AI</button>
+      </div>
+      <div class="sub" id="hp-briefs" style="margin-bottom:6px"></div>
+      <div class="sub" id="hp-enemies" style="margin-bottom:8px"></div>
+      <input id="hp-thought" placeholder="心里在想什么？（私有，不会被别人看到）"
+        style="width:100%;margin-bottom:8px;background:#0e1218;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:6px;padding:7px 8px;font:inherit">
+      <textarea id="hp-action" placeholder="你要做什么？写清具体动作（例：用短刀挑开它颈侧的管线）"
+        style="width:100%;min-height:56px;background:#0e1218;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:6px;padding:8px;font:inherit;resize:vertical"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+        <select id="hp-skill" style="background:#0e1218;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:6px;padding:6px"></select>
+        <select id="hp-intent" style="background:#0e1218;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:6px;padding:6px">
+          <option value="normal">正常</option>
+          <option value="careful">谨慎（DC −1）</option>
+          <option value="all_in">全力（DC +1）</option>
+        </select>
+        <select id="hp-mode" style="background:#0e1218;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:6px;padding:6px">
+          <option value="">非战斗</option>
+          <option value="attack">攻击</option>
+          <option value="defend">防御</option>
+          <option value="flee">逃跑</option>
+        </select>
+        <select id="hp-target" style="min-width:150px;background:#0e1218;color:#e6e6e6;border:1px solid #2a2f3a;border-radius:6px;padding:6px"></select>
+        <button id="hp-submit">提交</button>
+      </div>
+      <div class="sub" id="hp-hint" style="margin-top:6px">Ctrl+Enter 提交 · Esc 交给 AI · 超时未提交会由 AI 代打</div>
+    </div>
+
     <div id="log">
       <div class="empty">点右上角「开一局」开始。<br>每回合：GM 描述场景 → 各角色同时决策 → 骰子判定 → GM 叙事。</div>
     </div>
     <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
       <button id="advance" disabled>推进一回合</button>
+      <button id="hmode" class="ghost" style="display:none">托管模式</button>
       <span class="sub" id="timing"></span>
+    </div>
+    <div id="progress-wrap">
+      <div id="progress"><i id="pbar-i"></i></div>
+      <span id="pbar-label"></span>
     </div>
   </section>
 
@@ -136,6 +236,7 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
+const QS = new URLSearchParams(location.search);
 let sid = null;
 
 const badge = (outcome, raw) => {
@@ -143,12 +244,34 @@ const badge = (outcome, raw) => {
   return `<span class="badge ${tier}">${raw}</span>`;
 };
 
+function setTraceLink() {
+  const link = $("trace-link");
+  if (link) link.href = sid ? `/trace?sid=${encodeURIComponent(sid)}` : "/trace";
+}
+
+// 进局即锁：配置只在 /lobby 改，对局页不留任何可改控件（服务端也会拦）
+function setLocked(on) {
+  ["world", "players", "provider", "batch"].forEach(id => {
+    const el = $(id);
+    const box = el && el.closest("label");
+    if (box) box.style.display = on ? "none" : "";
+  });
+  $("new").style.display = on ? "none" : "";
+  $("hdr-note").textContent = on ? "（本局配置已锁定）" : "";
+}
+
 async function loadWorlds() {
   const r = await fetch("/api/worlds");
   const data = await r.json();
   $("world").innerHTML = data.worlds
     .map(w => `<option value="${w.id}">${w.name}（${w.counts.seeds} 种子）</option>`)
     .join("");
+  const want = QS.get("world");
+  if (want && [...$("world").options].some(o => o.value === want)) $("world").value = want;
+  const players = QS.get("players");
+  if (players && [...$("players").options].some(o => o.text === players)) $("players").value = players;
+  const provider = QS.get("provider");
+  if (provider && [...$("provider").options].some(o => o.value === provider)) $("provider").value = provider;
 }
 
 async function newSession() {
@@ -162,22 +285,348 @@ async function newSession() {
         world: $("world").value,
         players: Number($("players").value),
         provider: $("provider").value,
-        seed: "42",
+        seed: QS.get("seed") || "42",
+        model: QS.get("model") || null,
+        reasoning_effort: QS.get("effort") || null,
+        style: QS.get("style") || "",
       }),
     });
     if (!r.ok) throw new Error(await r.text());
     const s = await r.json();
     sid = s.session_id;
+    setTraceLink();
     $("log").innerHTML = "";
     $("advance").disabled = false;
-    $("hdr-sub").textContent = `${s.world.name} · ${s.world.era} · ${s.region} · ${s.session_id}`;
+    $("hdr-sub").textContent = `${s.world.name} · ${s.region_label || s.region}`;
+    setLocked(true);
     renderState(s);
   } catch (e) {
-    $("log").innerHTML = `<div class="empty" style="color:#b5544a">开局失败：${e.message}</div>`;
+    $("log").innerHTML = `<div class="empty" style="color:#b5544a">开局失败：${friendlyError(e)}</div>`;
   } finally {
     $("new").disabled = false;
     $("new").textContent = "开一局";
   }
+}
+
+async function advanceOnceSSE(onEvent) {
+  const res = await fetch(`/api/sessions/${sid}/advance/stream`);
+  if (!res.ok || !res.body) throw new Error(`stream ${res.status}`);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  let last = null;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let cut;
+    while ((cut = buf.indexOf("\n\n")) >= 0) {
+      const chunk = buf.slice(0, cut);
+      buf = buf.slice(cut + 2);
+      const lines = chunk.split("\n");
+      const evLine = lines.find(l => l.startsWith("event: "));
+      const dataLine = lines.find(l => l.startsWith("data: "));
+      if (!evLine || !dataLine) continue;
+      const ev = evLine.slice(7).trim();
+      let data = {};
+      try { data = JSON.parse(dataLine.slice(6)); } catch (_) { continue; }
+      if (ev === "done") last = data;
+      else if (ev === "error") throw new Error(data.message || "推进失败");
+      else if (onEvent) onEvent(ev, data);
+    }
+  }
+  if (!last) throw new Error("流结束但没有结果");
+  return last;
+}
+
+function progressLine(ev, data) {
+  const el = $("timing");
+  if (ev === "stage") el.textContent = data.phase === "scene" ? "GM 写场景…" : "导演决策…";
+  else if (ev === "npc") el.textContent = `NPC 动向：${(data.names || []).join("、") || "无"}`;
+  else if (ev === "actor") el.textContent = `${data.name} → ${data.outcome}（${data.total} vs ${data.dc}）`;
+  else if (ev === "narrate") el.textContent = "叙事生成中…";
+  else if (ev === "commit") el.textContent = `状态已提交 v${data.version}`;
+}
+
+let humanTimer = null;
+
+function startCountdown(ms) {
+  clearInterval(humanTimer);
+  const end = Date.now() + Math.max(1000, ms);
+  const tick = () => {
+    const left = Math.max(0, end - Date.now());
+    $("hp-countdown").textContent = `剩余 ${Math.ceil(left / 1000)}s（超时由 AI 代打）`;
+    if (left <= 0) clearInterval(humanTimer);
+  };
+  tick();
+  humanTimer = setInterval(tick, 1000);
+}
+
+function currentState() {
+  return window.__state || { characters: [], enemies: [] };
+}
+
+function showHumanPanel(d) {
+  const panel = $("human-panel");
+  panel.style.display = "block";
+  $("hp-who").textContent = `${d.name || "你"} · 第 ${d.turn || "?"} 回合轮到你`;
+
+  const st = currentState();
+  const me = (st.characters || []).find(c => c.id === d.id);
+  $("hp-state").textContent = me
+    ? [
+        `HP ${me.hp}/${me.hp_max}`,
+        `理智 ${me.sanity}`,
+        me.path_label || me.profession || "",
+        (me.conditions || []).length ? me.conditions.join("、") : "",
+      ].filter(Boolean).join(" · ")
+    : "";
+
+  const briefs = d.briefs || [];
+  $("hp-briefs").textContent = briefs.length
+    ? "此前：" + briefs.join("；")
+    : "你是本回合第一个行动的人";
+
+  // 敌人：给出 hp 与可选目标，避免让人手打 id
+  const enemies = st.enemies || [];
+  $("hp-enemies").innerHTML = enemies.length
+    ? "场上敌人：" + enemies.map(e =>
+        `${e.name || e.id}（${e.id}，HP ${e.hp}/${e.hp_max}）`).join("　")
+    : "";
+  $("hp-target").innerHTML =
+    '<option value="">（无目标）</option>' +
+    enemies.map(e => `<option value="${e.id}">${e.name || e.id}（hp ${e.hp}）</option>`).join("");
+
+  // 技能：带上数值，让玩家知道自己的长项
+  const skills = d.skills || [];
+  const mine = (me && me.skills) || {};
+  $("hp-skill").innerHTML =
+    '<option value="">（不指定技能）</option>' +
+    skills.map(s => `<option value="${s}">${s}${mine[s] ? " " + mine[s] : ""}</option>`).join("");
+
+  $("hp-submit").disabled = false;
+  $("hp-submit").textContent = "提交";
+  startCountdown(d.timeout_ms || 120000);
+  $("hp-action").focus();
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function hideHumanPanel() {
+  clearInterval(humanTimer);
+  $("human-panel").style.display = "none";
+  $("hp-action").value = "";
+  $("hp-submit").disabled = false;
+  $("hp-submit").textContent = "提交";
+}
+
+async function submitHuman(ghost) {
+  if (!sid) return;
+  const body = {
+    action: $("hp-action").value.trim(),
+    thought: $("hp-thought").value.trim(),
+    skill: $("hp-skill").value || null,
+    intent: $("hp-intent").value,
+    mode: $("hp-mode").value || null,
+    target: $("hp-target").value || null,
+    ghost,
+  };
+  if (!ghost && !body.action) {
+    $("hp-countdown").textContent = "先写一句你要做什么（也可以点「交给 AI」）";
+    return;
+  }
+  if (!ghost && body.mode === "attack" && !body.target) {
+    const enemies = currentState().enemies || [];
+    if (enemies.length > 1) {
+      $("hp-countdown").textContent = "场上不止一个敌人，请选一个目标";
+      return;
+    }
+  }
+  try {
+    const r = await fetch(`/api/sessions/${sid}/action`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      $("hp-countdown").textContent = "提交失败：" + (await r.text()).slice(0, 80);
+      return;
+    }
+    $("hp-submit").disabled = true;
+    $("hp-submit").textContent = "已提交";
+    $("hp-countdown").textContent = "已提交，等本回合结算…";
+  } catch (e) {
+    $("hp-countdown").textContent = "提交失败：" + e.message;
+  }
+}
+
+function liveTurnBlock(text) {
+  const log = $("log");
+  // 上一回合并未正常收尾时，先把它清掉，避免两个「生长中」块打架
+  log.querySelectorAll(".turn.live").forEach(el => el.classList.remove("live"));
+  const div = document.createElement("div");
+  div.className = "turn live";
+  div.innerHTML = `<div class="hdr"><span class="spin"></span>GM 正在写…</div><div class="scene"></div>`;
+  log.appendChild(div);
+  typeInto(div.querySelector(".scene"), text || "");
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+function handleSSE(ev, data) {
+  if (ev === "human_wait") { showHumanPanel(data); return; }
+  if (ev === "human_done") { hideHumanPanel(); return; }
+  if (ev === "scene") { liveTurnBlock(data.text || ""); return; }
+  progressLine(ev, data);
+}
+
+// 点选项 → 填进人类输入框；没有人类席位时只提示（不替 AI 决定）
+document.addEventListener("click", (ev) => {
+  const btn = ev.target.closest ? ev.target.closest(".opt") : null;
+  if (!btn) return;
+  const label = btn.dataset.label || btn.textContent.trim();
+  const box = document.querySelector("#human-panel textarea, #human-panel input[type=text]");
+  if (box) {
+    box.value = label;
+    box.focus();
+    return;
+  }
+  $("timing").textContent = `已选：${label}（本席位由 AI 扮演，可作参考方向）`;
+});
+
+// 人类席位两态：wait（一直等你）/ handoff（超时代打）
+$("hmode").addEventListener("click", async () => {
+  if (!sid) return;
+  const cur = ($("hmode").dataset.mode || "handoff");
+  const next = cur === "wait" ? "handoff" : "wait";
+  try {
+    const r = await fetch(`/api/sessions/${sid}/human/mode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: next }),
+    });
+    if (!r.ok) throw new Error(String(r.status));
+    setHumanMode(next);
+  } catch (e) {
+    $("timing").textContent = friendlyError(e);
+  }
+});
+
+function setHumanMode(mode) {
+  const btn = $("hmode");
+  if (!mode) { btn.style.display = "none"; return; }
+  btn.style.display = "";
+  btn.dataset.mode = mode;
+  btn.textContent = mode === "wait" ? "等待模式（不代打）" : "托管模式（超时代打）";
+}
+
+// ── 角色档案抽屉：数据全部来自已有结构，不新增存储 ──
+function kvRow(k, v) {
+  return `<div class="row"><span>${k}</span><span>${v}</span></div>`;
+}
+
+function renderProfile(p) {
+  const b = p.basic, n = p.now, g = p.growth;
+  $("pd-body").innerHTML = `
+    <h3>${b.name}${n.controller === "human" ? "（你）" : ""}</h3>
+    <div class="sub">${b.path_label || b.profession}${b.origin_label ? " · " + b.origin_label : ""}</div>
+    <h4>现状</h4>
+    ${kvRow("HP", `${n.hp} / ${n.hp_max}`)}
+    ${kvRow("理智", `${n.sanity} / ${n.sanity_max}`)}
+    ${kvRow("钱 / 补给", `${n.gold} / ${n.supplies}`)}
+    ${kvRow("状态", (n.conditions || []).join("、") || "正常")}
+    <h4>行装</h4>
+    ${(p.gear || []).length
+      ? p.gear.map(x => `<div class="row"><span>${x.name}</span><span>tier ${x.tier} ${x.quality}${(x.tags || []).length ? " · " + x.tags.join("/") : ""}</span></div>`).join("")
+      : '<div class="sub">空手</div>'}
+    <h4>成长</h4>
+    ${Object.keys(g.skills || {}).length
+      ? Object.entries(g.skills).map(([k, v]) => kvRow(k, v)).join("")
+      : '<div class="sub">还没有熟练技能</div>'}
+    ${(g.scars || []).length ? kvRow("疤痕", g.scars.join("、")) : ""}
+    <h4>经历年表</h4>
+    ${(p.timeline || []).length
+      ? p.timeline.map(t => `<div class="ev">${t.star ? "★ " : ""}<b>第${t.turn}回合</b>　${t.summary || ""}</div>`).join("")
+      : '<div class="sub">还没有记录</div>'}
+    <h4>关系</h4>
+    ${Object.keys(p.relations.reputation || {}).length
+      ? Object.entries(p.relations.reputation).map(([k, v]) => kvRow(k, v)).join("")
+      : '<div class="sub">还没有人记得你</div>'}
+  `;
+  $("profile-drawer").scrollTop = 0;
+}
+
+async function openProfile(cid) {
+  if (!sid) return;
+  $("profile-drawer").classList.add("open");
+  $("pd-body").innerHTML = '<div class="empty">读取档案…</div>';
+  try {
+    const r = await fetch(`/api/sessions/${sid}/characters/${encodeURIComponent(cid)}/profile`);
+    if (!r.ok) throw new Error(String(r.status));
+    renderProfile(await r.json());
+  } catch (e) {
+    $("pd-body").innerHTML = `<div class="empty" style="color:#b5544a">${friendlyError(e)}</div>`;
+  }
+}
+
+document.addEventListener("click", (ev) => {
+  const card = ev.target.closest ? ev.target.closest(".profile-link") : null;
+  if (card) {
+    openProfile(card.dataset.cid);
+    return;
+  }
+  if (ev.target.id === "pd-close" || ev.target.id === "profile-drawer") {
+    $("profile-drawer").classList.remove("open");
+  }
+});
+
+// ── 进度与预估：等 50 秒也要让人知道在等什么、还要多久 ──
+const turnMs = [];
+let pbarTimer = null;
+
+function estimateTurnMs() {
+  if (!turnMs.length) return 45000;  // 首次没有历史，按实测均值给个初值
+  const recent = turnMs.slice(-5);
+  return recent.reduce((a, b) => a + b, 0) / recent.length;
+}
+
+function startProgress(label) {
+  $("progress-wrap").style.display = "block";
+  const bar = $("pbar-i");
+  const started = Date.now();
+  const avg = estimateTurnMs();
+  bar.style.width = "4%";
+  clearInterval(pbarTimer);
+  pbarTimer = setInterval(() => {
+    const spent = Date.now() - started;
+    bar.style.width = Math.min(92, 4 + (spent / avg) * 88).toFixed(1) + "%";
+    $("pbar-label").textContent =
+      `${label}　预计约剩 ${Math.max(0, Math.ceil((avg - spent) / 1000))}s`;
+  }, 250);
+}
+
+function stopProgress() {
+  clearInterval(pbarTimer);
+  $("pbar-i").style.width = "100%";
+  setTimeout(() => {
+    $("progress-wrap").style.display = "none";
+    $("pbar-i").style.width = "0%";
+    $("pbar-label").textContent = "";
+  }, 220);
+}
+
+// ── 中文报错：不要把 {"detail":...} 和 stream 500 直接甩给玩家 ──
+function friendlyError(e) {
+  const msg = String((e && e.message) || e || "");
+  const code = Number((msg.match(/^(\d{3})\b/) || [])[1] || 0);
+  if (code === 401) return "登录已过期，请重新登录";
+  if (code === 403) return "没有权限执行这个操作";
+  if (code === 404) return "找不到这个对象（可能已被删除）";
+  if (code === 409) return "当前状态不允许这个操作";
+  if (code >= 500) return "服务端出错了，请稍后重试";
+  if (/Failed to fetch|NetworkError|network/i.test(msg)) {
+    return "连不上服务（网络或服务已停止），请检查后重试";
+  }
+  return msg || "未知错误";
 }
 
 async function advance() {
@@ -191,11 +640,13 @@ async function advance() {
   try {
     for (let i = 0; i < total; i++) {
       btn.innerHTML = `<span class="spin"></span>第 ${i + 1}/${total} 回合推演中…`;
-      const r = await fetch(`/api/sessions/${sid}/advance`, { method: "POST" });
-      if (!r.ok) throw new Error(await r.text());
-      const res = await r.json();
+      startProgress(`第 ${i + 1}/${total} 回合`);
+      const res = await advanceOnceSSE(handleSSE);
+      stopProgress();
+      turnMs.push(res.elapsed_ms || 0);
       appendTurn(res);
       renderState(res.state);
+      if (res.ending && res.ending.epilogue) appendEnding(res.ending);
       totalMs += res.elapsed_ms;
       $("timing").textContent =
         `已完成 ${i + 1}/${total} 回合，本回合 ${(res.elapsed_ms / 1000).toFixed(1)}s` +
@@ -205,7 +656,8 @@ async function advance() {
       `连跑 ${total} 回合完成，共 ${(totalMs / 1000).toFixed(1)}s，` +
       `平均 ${(totalMs / total / 1000).toFixed(1)}s/回合`;
   } catch (e) {
-    $("timing").textContent = "推进失败：" + e.message;
+    stopProgress();
+    $("timing").textContent = "推进失败：" + friendlyError(e);
   } finally {
     btn.disabled = false;
     btn.textContent = "推进";
@@ -213,57 +665,210 @@ async function advance() {
   }
 }
 
-function appendTurn(res) {
-  const log = $("log");
-  const div = document.createElement("div");
-  div.className = "turn";
-  const acts = res.actors.map(a => `
+// ── 打字机：GM 的句子一个字一个字出来，点一下直接显示全文 ──
+let typer = null;
+
+function typeInto(el, text) {
+  if (!text) return;
+  if (typer) typer.finish();
+  el.textContent = "";
+  let i = 0;
+  const timer = setInterval(() => {
+    if (i >= text.length) {
+      clearInterval(timer);
+      el.textContent = text;
+      el.dataset.typed = "1";
+      if (typer) typer = null;
+      return;
+    }
+    el.textContent += text.slice(i, i + 2);
+    i += 2;
+  }, 30);
+  typer = {
+    finish() {
+      clearInterval(timer);
+      el.textContent = text;
+      el.dataset.typed = "1";
+      typer = null;
+    },
+  };
+  el.onclick = () => { if (typer) typer.finish(); };
+}
+
+function turnBodyHtml(res) {
+  // 选项放在最前：这是"我现在能做什么"，比事后读叙事更有用
+  const opts = (res.options || []).length ? `
+    <div class="opts">
+      ${res.options.map(o => `<button class="opt" data-label="${(o.label || "").replace(/"/g, "&quot;")}">
+        ${o.label || ""}${o.hint ? `<span class="hint">${o.hint}</span>` : ""}
+      </button>`).join("")}
+    </div>` : "";
+
+  const acts = (res.actors || []).map(a => `
     <div class="act">
       <div class="who">${a.name}${a.profession ? `·${a.profession}` : ""}${badge(a.outcome, a.outcome)}</div>
-      ${a.thought ? `<p class="think"><b>心中</b> ${a.thought}</p>` : ""}
+      ${a.thought ? `<details class="think"><summary>他当时在想什么</summary><p>${a.thought}</p></details>` : ""}
       ${a.action ? `<p class="do">${a.action}</p>` : ""}
       <p>${a.narration || "…"}</p>
     </div>`).join("");
-  div.innerHTML = `
-    <div class="hdr">回合 ${res.turn}</div>
-    <div class="scene">${res.scene}</div>
-    ${acts}
-    ${res.rejected && res.rejected.length
-      ? `<div class="sub" style="color:#b5544a">被拒状态变更：${res.rejected.join(" | ")}</div>` : ""}
-  `;
-  log.appendChild(div);
+
+  const extras = [];
+  if ((res.loot || []).length) {
+    extras.push(`<div class="sub">获得：${res.loot.map(l =>
+      `${l.name}（tier ${l.tier} ${l.quality}）`).join("、")}</div>`);
+  }
+  if ((res.combat || []).length) {
+    extras.push(`<div class="sub">战斗：${res.combat.map(c =>
+      `${c.kind}${c.target ? "→" + c.target : ""}${c.damage ? " −" + c.damage : ""}${c.killed ? "（击杀）" : ""}`).join(" | ")}</div>`);
+  }
+  if ((res.deaths || []).length) {
+    extras.push(`<div class="sub" style="color:#b5544a">死亡：${res.deaths.map(d => d.char_id).join("、")}</div>`);
+  }
+  if ((res.path_changes || []).length) {
+    extras.push(`<div class="sub">身份变更：${res.path_changes.map(p =>
+      `${p.char_id} → ${p.label || p.path}`).join("、")}</div>`);
+  }
+  const rejected = res.rejected && res.rejected.length
+    ? `<div class="sub" style="color:#b5544a">被拒状态变更：${res.rejected.join(" | ")}</div>` : "";
+  // 「本回合变化」单独成卡：战利品/伤害/状态原来埋在灰字里，玩家看不见
+  const changes = extras.length
+    ? `<div class="changes"><div class="chdr">本回合变化</div>${extras.join("")}</div>`
+    : "";
+  return opts + acts + changes + rejected;
+}
+
+function appendTurn(res) {
+  const log = $("log");
+  // 场景阶段已经建了一个「生长中」的块：沿用它，别把场景写两遍
+  let div = log.querySelector(".turn.live");
+  if (div) {
+    div.classList.remove("live");
+    div.querySelector(".hdr").textContent = `回合 ${res.turn}`;
+    const sceneEl = div.querySelector(".scene");
+    if (!sceneEl.dataset.typed && !sceneEl.textContent) sceneEl.textContent = res.scene || "";
+    div.insertAdjacentHTML("beforeend", turnBodyHtml(res));
+  } else {
+    div = document.createElement("div");
+    div.className = "turn";
+    div.innerHTML = `
+      <div class="hdr">回合 ${res.turn}</div>
+      <div class="scene">${res.scene}</div>
+      ${turnBodyHtml(res)}
+    `;
+    log.appendChild(div);
+  }
   log.scrollTop = log.scrollHeight;
 }
 
+function appendEnding(payload) {
+  const log = $("log");
+  const div = document.createElement("div");
+  div.className = "turn";
+  const rows = (payload.characters || []).map(c => `
+    <div class="kv"><span>${c.name}${c.path ? "·" + c.path : ""}</span>
+      <span>${c.position === "dead" ? "死亡" : `HP ${c.hp}`}</span></div>`).join("");
+  div.innerHTML = `
+    <div class="hdr">结局（${payload.kind === "wipe" ? "全灭" : "手动结束"} · 第 ${payload.turn} 回合）</div>
+    <div class="scene">${(payload.epilogue || "").replace(/\n/g, "<br>")}</div>
+    ${rows}`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  $("advance").disabled = true;
+}
+
 function renderState(s) {
+  window.__state = s;  // 人类面板要读角色状态与场上敌人
+  // 顶栏一行：世界 · 时间 · 地点 · 幕次 · 天气 · 张力（不放任何内部 id）
+  $("statusbar").innerHTML = [
+    ["world", s.world.name],
+    ["", s.clock_label || ""],
+    ["", `${s.location_label || s.location}（${s.region_label || s.region}）`],
+    ["", `第 ${s.stage}/4 幕`],
+    ["", s.weather_label || s.clock.weather || ""],
+    ["", `张力 ${s.tension}`],
+  ].filter(x => x[1]).map(([cls, text]) =>
+    `<span class="chip ${cls}">${text}</span>`).join("");
+
   $("chars").innerHTML = s.characters.map(c => {
     const hpPct = Math.max(0, Math.round(100 * c.hp / c.hp_max));
     const sanPct = Math.max(0, Math.min(100, c.sanity * 10));
     return `
-      <div class="card">
-        <div class="name">${c.name}</div>
-        <div class="meta">${c.profession} · HP ${c.hp}/${c.hp_max} · 理智 ${c.sanity}</div>
+      <div class="card profile-link" data-cid="${c.id}" title="点开档案">
+        <div class="name">${c.name}${c.controller === "human" ? "（你）" : ""}${c.position === "dead" ? " ☠" : ""}</div>
+        <div class="meta">${c.path_label || c.profession}${c.origin_label ? " · " + c.origin_label : ""} · HP ${c.hp}/${c.hp_max} · 理智 ${c.sanity}</div>
         <div class="bar"><i style="width:${hpPct}%"></i></div>
         <div class="bar san"><i style="width:${sanPct}%"></i></div>
-        ${c.conditions.length ? `<div class="meta">状态：${c.conditions.join("、")}</div>` : ""}
+        ${c.gold !== undefined ? `<div class="meta">钱 ${c.gold} · 补给 ${c.supplies}</div>` : ""}
+        ${(c.gear || []).length ? `<div class="meta">行装：${c.gear.join("、")}</div>` : ""}
+        ${c.talents && c.talents.length ? `<div class="meta">天赋：${c.talents.join("、")}</div>` : ""}
+        ${c.conditions.length ? `<div class="meta"${c.conditions.includes("dying") ? ' style="color:#b5544a"' : ""}>状态：${c.conditions.join("、")}</div>` : ""}
       </div>`;
   }).join("");
 
   $("world-info").innerHTML = `
     <div class="kv"><span>幕次</span><span>${s.stage}/4</span></div>
     <div class="kv"><span>张力</span><span>${s.tension}</span></div>
-    <div class="kv"><span>时间</span><span>第 ${s.clock.day} 天 ${String(s.clock.hour).padStart(2, "0")}:00</span></div>
-    <div class="kv"><span>地点</span><span>${s.location}</span></div>
-    <div class="kv"><span>区域</span><span>${s.region}</span></div>
-    <div class="kv"><span>金币/补给</span><span>${s.party.gold} / ${s.party.supplies}</span></div>
+    <div class="kv"><span>时间</span><span>${s.clock_label || "—"}</span></div>
+    <div class="kv"><span>地点</span><span>${s.location_label || s.location}</span></div>
+    <div class="kv"><span>区域</span><span>${s.region_label || s.region}</span></div>
+    <div class="kv"><span>公共仓</span><span>${s.party.gold} / ${s.party.supplies}</span></div>
     <div class="kv"><span>状态版本</span><span>v${s.version}</span></div>
     <div class="kv"><span>已推进</span><span>${s.turns} 回合</span></div>
+    ${(s.present || []).length ? `<div class="kv"><span>在场</span><span>${s.present.join("、")}</span></div>` : ""}
+    ${(s.reputation && Object.keys(s.reputation).length)
+      ? `<div class="kv"><span>势力</span><span>${Object.entries(s.reputation).map(([k, v]) => `${k} ${v}`).join(" · ")}</span></div>`
+      : ""}
+    ${(s.quests || []).length
+      ? `<div class="kv" style="display:block"><span>任务</span></div>` +
+        s.quests.map(q => `<div class="meta">${q.status === "done" ? "✓" : "·"} ${q.title}${q.progress ? `（${q.progress}）` : ""}</div>`).join("")
+      : ""}
   `;
+
+  setHumanMode(s.human_mode);
 }
 
 $("new").addEventListener("click", newSession);
 $("advance").addEventListener("click", advance);
-loadWorlds();
+$("hp-submit").addEventListener("click", () => submitHuman(false));
+$("hp-ghost").addEventListener("click", () => submitHuman(true));
+
+// 快捷键：面板可见时 Ctrl+Enter 提交、Esc 交给 AI
+document.addEventListener("keydown", (ev) => {
+  if ($("human-panel").style.display === "none") return;
+  if (ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) {
+    ev.preventDefault();
+    submitHuman(false);
+  } else if (ev.key === "Escape") {
+    ev.preventDefault();
+    submitHuman(true);
+  }
+});
+
+// 支持 ?sid=xxx 直接恢复一局（GM 配置页 / trace 页跳过来用）
+async function bootFromQuery() {
+  const want = QS.get("sid");
+  if (!want) return;
+  const provider = QS.get("provider") || "auto";
+  try {
+    const r = await fetch(`/api/sessions/${want}/resume?provider=${encodeURIComponent(provider)}`, { method: "POST" });
+    if (!r.ok) return;
+    const s = await r.json();
+    sid = s.session_id;
+    setTraceLink();
+    $("advance").disabled = s.status === "ended";
+    $("hdr-sub").textContent = `${s.world.name} · ${s.region_label || s.region}`;
+    $("hdr-note").textContent = "（下方世界/玩家/连跑是「新局」设置；当前局已开，不影响它）";
+    renderState(s);
+  } catch (_) { /* 恢复失败就当没传 */ }
+}
+
+loadWorlds().then(bootFromQuery);
+setTraceLink();
 </script>
+<div id="profile-drawer" aria-hidden="true">
+  <button id="pd-close">关闭</button>
+  <div id="pd-body"></div>
+</div>
+<script src="/static/blocks.js"></script>
 </body>
 </html>

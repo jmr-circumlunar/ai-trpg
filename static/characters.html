@@ -169,12 +169,26 @@ const toast = (msg) => {
 };
 
 async function loadProfessions() {
-  const r = await fetch("/api/worlds/ironvale/professions");
+  // 世界不能再写死：取 ?world= 参数，没有就用第一个可用世界包
+  let world = new URLSearchParams(location.search).get("world") || "";
+  if (!world) {
+    try {
+      const wr = await fetch("/api/worlds");
+      const all = (await wr.json()).worlds || [];
+      world = all.length ? all[0].id : "";
+    } catch (e) {
+      world = "";
+    }
+  }
+  if (!world) return;
+  window.__world = world;
+
+  const r = await fetch(`/api/worlds/${encodeURIComponent(world)}/professions`);
   const data = await r.json();
-  professionPool = data.professions;
-  $("profession").innerHTML = professionPool
-    .map(p => `<option value="${p.id}">${p.label || p.id}（${p.id}）</option>`)
-    .join("");
+  professionPool = data.professions || [];
+  $("profession").innerHTML = professionPool.length
+    ? professionPool.map(p => `<option value="${p.id}">${p.label || p.id}（${p.id}）</option>`).join("")
+    : '<option value="">（这个世界没有职业池：用出身/身份建卡）</option>';
 }
 
 function renderStats(stats) {
@@ -308,7 +322,11 @@ async function newCharacter() {
 }
 
 async function seedPresets() {
-  const r = await fetch("/api/characters/presets?world=ironvale&players=6", { method: "POST" });
+  const world = window.__world || "";
+  const r = await fetch(
+    `/api/characters/presets?world=${encodeURIComponent(world)}&players=6`,
+    { method: "POST" },
+  );
   if (!r.ok) return toast("导入失败");
   const data = await r.json();
   toast(`已导入 ${data.count} 个角色`);

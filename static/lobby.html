@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>准备开局 · AI 跑团</title>
+<style>
+  :root{--bg:#12141a;--panel:#1a1d25;--line:#2a2f3a;--ink:#d8dbe2;--dim:#8b93a3;--gold:#c8a45c}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.7 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+  header{display:flex;gap:14px;align-items:center;padding:16px 24px;border-bottom:1px solid var(--line);background:var(--panel)}
+  header h1{margin:0;font-size:17px;color:var(--gold);letter-spacing:.14em}
+  header .grow{flex:1}
+  a{color:var(--dim);text-decoration:none;font-size:13px}
+  main{max-width:860px;margin:0 auto;padding:24px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+  .panel h2{margin:0 0 4px;font-size:14px;color:var(--dim);font-weight:600;letter-spacing:.1em}
+  .tone{color:var(--dim);font-size:13px;margin-bottom:12px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+  label.f{display:block;color:var(--dim);font-size:12px;margin-bottom:5px}
+  select,input,textarea{width:100%;background:#0e1218;color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:inherit}
+  .seats{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px}
+  .seat{border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-width:150px;font-size:13px}
+  .seat b{display:block;color:var(--gold);margin-bottom:6px}
+  .hint{color:var(--dim);font-size:12px;margin-top:6px}
+  button{background:var(--gold);color:#1a1206;border:0;border-radius:6px;padding:10px 18px;font-weight:600;cursor:pointer}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #msg{margin-top:12px;font-size:13px}
+  .err{color:#b5544a}
+</style>
+</head>
+<body>
+<header>
+  <h1>准备开局</h1>
+  <span class="grow"></span>
+  <a href="/worlds">← 换世界</a>
+  <a href="/characters">角色库</a>
+</header>
+<main>
+  <div class="panel">
+    <h2>世界</h2>
+    <div id="world-name" class="tone">加载中…</div>
+    <div class="grid">
+      <div>
+        <label class="f">时间点（只能从已解锁的开局）</label>
+        <select id="timeline"></select>
+        <div class="hint" id="timeline-hint">—</div>
+      </div>
+      <div>
+        <label class="f">种子（同 seed = 同队伍、同骰序）</label>
+        <input id="seed" value="42">
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>席位</h2>
+    <div class="grid">
+      <div>
+        <label class="f">玩家数</label>
+        <select id="players">
+          <option>2</option><option selected>3</option><option>4</option>
+          <option>5</option><option>6</option>
+        </select>
+      </div>
+      <div>
+        <label class="f">叙事风格覆盖（空 = 用世界包的 style）</label>
+        <input id="style" placeholder="冷峻、克制，少形容词">
+      </div>
+    </div>
+    <div class="hint">勾选「我来操作」的角色轮到你时弹输入框；其余由 AI 扮演。开局后不可更换。</div>
+    <div class="seats" id="seats"></div>
+  </div>
+
+  <button id="start">开局（配置将锁定）</button>
+  <div id="msg"></div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const QS = new URLSearchParams(location.search);
+const world = QS.get("world") || "";
+let w = null;
+let agents = [];
+
+function renderSeats() {
+  const n = Number($("players").value) || 3;
+  const picked = new Set([...document.querySelectorAll("#seats input:checked")].map(i => i.value));
+  const chosen = [...document.querySelectorAll("#seats select.agt")].map(s => s.value);
+
+  $("seats").innerHTML = Array.from({ length: n }, (_, i) => {
+    const cid = `chr_p${i + 1}`;
+    const on = picked.has(cid) ? " checked" : "";
+    const opts = ['<option value="">（不绑 Agent）</option>']
+      .concat(agents.map(a => {
+        const sel = chosen[i] === a.id ? " selected" : "";
+        return `<option value="${a.id}"${sel}>${a.name}</option>`;
+      })).join("");
+    return `<div class="seat"><b>角色 ${i + 1}</b>
+      <label class="f" style="margin:6px 0 2px">Agent（人）</label>
+      <select class="agt" data-seat="${i}">${opts}</select>
+      <label style="display:block;margin-top:8px"><input type="checkbox" value="${cid}"${on}> 我来操作</label>
+    </div>`;
+  }).join("");
+}
+
+async function loadAgents() {
+  try {
+    const r = await fetch("/api/agents");
+    agents = (await r.json()).agents || [];
+  } catch (e) {
+    agents = [];
+  }
+}
+
+async function loadWorld() {
+  const r = await fetch("/api/worlds");
+  if (!r.ok) { $("world-name").textContent = "读不到世界包"; return; }
+  const all = (await r.json()).worlds || [];
+  w = all.find(x => x.id === world) || all[0];
+  if (!w) { $("world-name").textContent = "没有可用世界"; $("start").disabled = true; return; }
+  $("world-name").textContent = `${w.name}　${(w.tone || "").slice(0, 80)}`;
+  const list = (w.timelines || []).filter(t => t.available);
+  $("timeline").innerHTML = list.map(t => `<option value="${t.id}">${t.label}</option>`).join("")
+    || '<option value="">（该世界没有时间线）</option>';
+  if (w.default_timeline) $("timeline").value = w.default_timeline;
+  $("timeline-hint").textContent = list.length ? (list[0].premise || "") : "按默认开局";
+  await loadAgents();
+  renderSeats();
+}
+
+async function start() {
+  $("start").disabled = true;
+  $("msg").textContent = "开局中（生成地图与角色，可能要几秒）…";
+  const body = {
+    world: w ? w.id : world,
+    players: Number($("players").value),
+    provider: "auto",
+    seed: $("seed").value.trim() || "42",
+    style: $("style").value.trim(),
+    timeline: $("timeline").value || null,
+    human_ids: [...document.querySelectorAll("#seats input:checked")].map(i => i.value),
+    agent_ids: [...document.querySelectorAll("#seats select.agt")].map(s => s.value),
+  };
+  try {
+    const r = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      $("msg").innerHTML = `<span class="err">开局失败：${txt.slice(0, 200)}</span>`;
+      $("start").disabled = false;
+      return;
+    }
+    const s = await r.json();
+    location.href = `/play?sid=${encodeURIComponent(s.session_id)}`;
+  } catch (e) {
+    $("msg").innerHTML = `<span class="err">开局失败：${e.message}</span>`;
+    $("start").disabled = false;
+  }
+}
+
+$("players").addEventListener("change", renderSeats);
+$("start").addEventListener("click", start);
+loadWorld();
+</script>
+</body>
+</html>

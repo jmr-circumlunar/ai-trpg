@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>登录 · AI 跑团</title>
+<style>
+  :root { color-scheme: dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: #0b0e13; color: #e6e6e6;
+    font: 15px/1.6 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  .box { width: 320px; padding: 28px; background: #131720; border: 1px solid #232a36; border-radius: 12px; }
+  h1 { font-size: 18px; margin: 0 0 4px; letter-spacing: .5px; }
+  .sub { color: #8b93a3; font-size: 12px; margin-bottom: 20px; }
+  label { display: block; font-size: 12px; color: #8b93a3; margin: 12px 0 4px; }
+  input {
+    width: 100%; box-sizing: border-box; padding: 9px 10px; background: #0e1218; color: #e6e6e6;
+    border: 1px solid #2a2f3a; border-radius: 6px; font: inherit;
+  }
+  button {
+    width: 100%; margin-top: 20px; padding: 10px; background: #2f6f4f; color: #fff;
+    border: 0; border-radius: 6px; font: inherit; cursor: pointer;
+  }
+  button:disabled { background: #2a2f3a; color: #8b93a3; cursor: not-allowed; }
+  .err { margin-top: 12px; color: #b5544a; font-size: 13px; min-height: 18px; }
+  .hint { margin-top: 16px; font-size: 11px; color: #5d6472; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h1>AI 跑团</h1>
+    <div class="sub">需要账号才能进入（每回合都会消耗模型额度）</div>
+    <form id="f" autocomplete="on">
+      <label for="u">用户名</label>
+      <input id="u" name="username" autocomplete="username" required autofocus>
+      <label for="p">密码</label>
+      <input id="p" name="password" type="password" autocomplete="current-password" required>
+      <button id="b" type="submit">登录</button>
+    </form>
+    <div class="err" id="e"></div>
+    <div class="hint">账号由管理员创建；忘记密码请联系管理员重置。</div>
+  </div>
+<script>
+const $ = (id) => document.getElementById(id);
+$("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("e").textContent = "";
+  $("b").disabled = true;
+  $("b").textContent = "登录中…";
+  try {
+    const r = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: $("u").value.trim(), password: $("p").value }),
+    });
+    if (!r.ok) {
+      let msg = "登录失败";
+      try { msg = (await r.json()).detail || msg; } catch (_) {}
+      $("e").textContent = msg;
+      $("b").disabled = false;
+      $("b").textContent = "登录";
+      return;
+    }
+    location.href = "/";
+  } catch (err) {
+    $("e").textContent = "网络错误：" + err.message;
+    $("b").disabled = false;
+    $("b").textContent = "登录";
+  }
+});
+</script>
+</body>
+</html>
