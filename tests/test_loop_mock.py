@@ -3,10 +3,10 @@ import time
 from pathlib import Path
 
 from trpg.engine.loop import GameLoop
-from trpg.llm import MockLLM
+from trpg.agents import MockLLM
 from trpg.models import CharacterRuntime, GameState, Party, Scene, WorldRef
 from trpg.rules.loader import Rules
-from trpg.testing import make_card
+from support.builders import make_card
 
 ROOT = Path(__file__).resolve().parents[1]
 

@@ -1,6 +1,10 @@
 """集中定义的枚举——不得散落。
 
 命名纪律：`tier` 只指装备强度档；骰子结果档叫 `outcome`。
+
+doc: 03-模块/M01-数据模型/00-模块总述.md
+module: M01
+layer: L0
 """
 
 from __future__ import annotations
@@ -83,3 +87,11 @@ class SourceKind(str, Enum):
     initial = "initial"
     generated = "generated"
     loot = "loot"
+
+
+class CombatMode(str, Enum):
+    """战斗意图。skill 仍然是 12 技能之一，mode 只说明这一下想干什么。"""
+
+    attack = "attack"
+    defend = "defend"
+    flee = "flee"

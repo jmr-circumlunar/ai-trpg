@@ -1,0 +1,17 @@
+schema_version: 1
+
+# 介入规则（P5）：有秩序的地方，出了事**必须有人来**——由代码判定，不靠模型自觉。
+#
+# 为什么不交给 GM：模型会"忘记"，而学院主区打了半天没人管，是最伤沉浸的破绽。
+#
+# 判定口径：近 N 回合内发生过战斗，或张力超过阈值 → 强制注入该区域的 authority NPC。
+# 区域秩序等级与 authority 名单写在 worlds/<id>/world.yaml 的 regions.<id> 里。
+
+authority_response:
+  # 各秩序等级允许多晚才到场（回合数）。none = 永不强制（荒野/地下）。
+  turns_by_order:
+    high: 2        # 学院主区 / 宿舍区：2 回合内必到
+    medium: 3      # 旧城这类半秩序地带
+    low: 5         # 边缘地带：给玩家更大的活动空间
+  tension_threshold: 45   # 即使没打起来，张力够高也会有人来查看
+  cooldown_turns: 3       # 同一次冲突不重复派人（避免每回合都来人）

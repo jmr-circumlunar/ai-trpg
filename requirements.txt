@@ -4,3 +4,8 @@ pytest>=8.0
 fastapi>=0.111
 uvicorn[standard]>=0.30
 httpx>=0.27
+# 编排层（项目核心目标之一）：StateGraph / checkpointer / interrupt / Store。
+# 现在两条路径并存：`engine/loop.py::step()`（手写 for 循环，默认）
+# 与 `engine/graph.py::run_turn()`（LangGraph，已验证逐字段等价）。
+langgraph>=1.2
+numpy>=1.26          # 向量检索（float32 矩阵）：替代纯 Python 暴力余弦，省 8 倍内存

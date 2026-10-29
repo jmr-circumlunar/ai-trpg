@@ -20,3 +20,21 @@ worlds/longzu/
 worlds/*/characters/*.json
 !worlds/_template/**
 !worlds/_shared/**
+
+# 前端构建（B51：Vue3 + Vite）
+# 依赖与构建产物都不进仓库：没装 Node 的环境照样能开页面（回退旧静态页）
+node_modules/
+static/dist/
+
+# 执行计划的运行时状态（方案 39）：台账进仓库留审计痕迹，租约与临时文件不进
+data/plan/lease.json
+data/plan/*.tmp
+data/plan/progress.json.bak
+
+# pytest 临时产物与一次性排障脚本：只在本地跑，不进仓库
+data/plan/_pytest*/
+data/plan/_pytest*.txt
+data/plan/_*.py
+data/plan/_*.txt
+tests/_tmp_*/
+

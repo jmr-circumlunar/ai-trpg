@@ -24,6 +24,30 @@ allowed_steps:
   - {minutes: 720, label: 睡到下一个时段/半天}
   - {minutes: 1440, label: 整整一天/昏迷后醒来}
 
+# 天气修正：和时段一样只影响 DC，正向 = 更难（与 phases.mod 同一套符号）
+# 取值就是这里的键；未知天气视为无修正（不报错、不篡改）
+weather_effects:
+  clear:
+    label: 晴
+    mod: {}
+  rain:
+    label: 雨
+    mod: {观察: 1, 追踪: 1}
+  fog:
+    label: 雾
+    mod: {观察: 2, 潜行: -1}
+  storm:
+    label: 风暴
+    mod: {观察: 1, 交涉: 1}
+
+# 天气演化（离散标签 + 过渡声明，S5-5）
+#
+# 词表与影响值在上面的 weather_effects；**怎么演化**是机制，由框架的钩子读这张表。
+# 空表 = 不演化（缺省零变化）；具体世界也可以在 worlds/<id>/weather.yaml 里声明自己的过渡。
+weather_transitions: {}
+# 例：{ 当前标签: [候选标签, ...] } 或 { 当前标签: { to: [候选标签, ...] } }
+#      不可转 / 未声明 → 保持不变（不报错）
+
 # 时段：影响 DC（按技能），不影响 tension（不制造"凭空变化"）
 phases:
   dawn:

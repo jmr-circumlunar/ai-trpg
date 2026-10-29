@@ -12,8 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from trpg.llm.env import llm_settings  # noqa: E402
-from trpg.llm.http import post_json  # noqa: E402
+from trpg.agents.env import llm_settings  # noqa: E402
+from trpg.net.http import post_json  # noqa: E402
 
 MESSAGES = [
     {"role": "system", "content": "你是跑团主持人。只输出 JSON。"},

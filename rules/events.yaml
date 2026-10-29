@@ -1,0 +1,38 @@
+# 事件声明（规则层兜底，S5-4）
+#
+# 两层来源，**世界包优先、规则层兜底**：
+# - 世界包：`worlds/<id>/events.yaml`（这个世界的具体事件）
+# - 规则层：本文件（通用默认，谁都可以用）
+#
+# 每条事件字段：
+# - `id`：事件 id（唯一）
+# - `category`：事件类别（**中性词**：encounter / discovery / hazard / social；
+#   具体含义由世界包解释，框架不认）
+# - `intensity`：强度（打分基数；框架不解释取值大小）
+# - `cooldown_turns`：冷却回合数（同一事件多少回合内不再出现）
+# - `requires`：触发前置（`min_turn` 起始回合；`regions` 限定区域）
+# - `text`：**确定性文本**（代码直接用，不经模型）
+# - `effects`：**确定性效果**（路径 + 值，走 StateDelta 白名单内的 apply_delta）
+# - `intent`：**模型解释意图**（只给 GM 当参考，**不自动执行**）
+schema_version: 1
+
+events:
+  - id: evt_stroll_noticed
+    category: discovery
+    intensity: 1
+    cooldown_turns: 3
+    requires:
+      min_turn: 2
+    text: "周围有些细节值得留意。"
+    effects: []
+    intent: "提示玩家注意到环境里的线索，但不要替玩家决定要不要去查。"
+
+  - id: evt_someone_nearby
+    category: social
+    intensity: 1
+    cooldown_turns: 2
+    requires:
+      min_turn: 1
+    text: "附近有人活动的动静。"
+    effects: []
+    intent: "给一个可能的人际接触场景，交给玩家决定是否搭话。"

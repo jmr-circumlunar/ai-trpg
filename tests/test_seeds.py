@@ -3,10 +3,10 @@
 import json
 from pathlib import Path
 
-from trpg.llm import AgentLLM, LLMConfig
-from trpg.llm.providers.base import ChatResult
+from trpg.agents import AgentLLM, LLMConfig
+from trpg.agents.providers.base import ChatResult
 from trpg.models import GameState, Scene, WorldRef
-from trpg.testing import make_card
+from support.builders import make_card
 from trpg.world import load_world
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -92,3 +92,12 @@ def test_same_seed_same_pick():
     assert [a._pick_seed(_state()) for _ in range(3)] == [
         b._pick_seed(_state()) for _ in range(3)
     ]
+
+
+def test_seeds_only_from_world_pack():
+    """B26：事件种子只有世界包一份真相，规则层不再提供 rules.seeds。"""
+    from trpg.rules import Rules
+
+    assert not hasattr(Rules(ROOT), "seeds"), "规则层不得再加载 event_seeds.yaml"
+    assert not (ROOT / "rules" / "event_seeds.yaml").exists()
+    assert PACK.seeds, "世界包 seeds.yaml 仍是唯一来源"

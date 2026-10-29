@@ -6,9 +6,9 @@
 import json
 from pathlib import Path
 
-from trpg.llm import AgentLLM, LLMConfig
-from trpg.llm.providers.base import ChatResult
-from trpg.testing import make_card, make_state
+from trpg.agents import AgentLLM, LLMConfig
+from trpg.agents.providers.base import ChatResult
+from support.builders import make_card, make_state
 
 ROOT = Path(__file__).resolve().parents[1]
 

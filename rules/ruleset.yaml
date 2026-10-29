@@ -17,12 +17,68 @@ stage_mod: {1: 0, 2: 1, 3: 2, 4: 3}
 intent_mod: {careful: -1, normal: 0, all_in: 1}
 situation_delta_cap: 2
 
+# 界面展示窗口（不是玩法数值，但同样不许写死在代码里）：
+# 对局页刷新后从库里回填「最近 N 回合」的事件，`max` 是前端能要到的上限。
+ui:
+  history_turns: 3
+  history_turns_max: 10
+
+# 张力对判定难度的影响（B1）：键 = 张力下限（含），值 = DC 修正（正向 = 更难）。
+# 取了「不高于当前张力的最高档」；这是环境难度，不受 situation_delta_cap 约束。
+tension_dc_mod: {0: 0, 30: 1, 60: 2, 80: 3}
+
+# 势力态度对社交判定的影响（B2）：
+# 态度分 = 势力基础态度(world.yaml) + trunc(reputation / attitude_reputation_step)，再查 bands。
+# 只作用于 skills 里列出的技能；inverted 里的技能取反（越敌对，交涉越难、威吓越容易）。
+attitude_reputation_step: 5
+attitude_dc_mod:
+  skills: [交涉, 威吓]
+  inverted: [威吓]
+  bands: {-3: 3, -2: 2, -1: 1, 0: 0, 1: -1, 2: -2, 3: -3}
+
+# 濒死宽限：hp 归 0 后还能被救的回合数（超过即 DEAD，之后不再入场）
+death_grace_turns: 2
+
 # 四档判定
 dice:
   sides: 20
   crit: 20
   crit_margin: 10
   fail_forward_floor: -2
+
+# 判定档位表（S1-3）：id / 中文 label / when
+# `when` 只允许**命名谓词**（trpg/rules/outcomes.py 的注册表），不执行世界包表达式。
+# 判定顺序 = 下面从上到下，第一个命中的档位生效；`otherwise` 必须兜底。
+outcomes:
+  - id: crit_success
+    label: 大成功
+    when: crit_face_or_margin
+  - id: success
+    label: 成功
+    when: margin_at_least_zero
+  - id: fail_forward
+    label: 勉强成功
+    when: margin_at_least_floor
+  - id: failure
+    label: 失败
+    when: otherwise
+
+# 二期：人机混合。人类席位等待上限（秒），超时由 LLM 代打（ghost）
+human_timeout_seconds: 120
+
+# 角色状态词封闭表：conditions 只能是这些词
+# 「登记处关注」「申请受阻」这类叙事短语一律丢弃——状态栏是硬状态，不是记忆便签
+condition_vocab:
+  - dying      # 代码判定用，不要翻译
+  - 流血
+  - 重伤
+  - 疲惫
+  - 暴露
+  - 隐蔽
+  - 被束缚
+  - 中毒
+  - 被盯上
+  - 失温
 
 skill_attr:
   潜行: dex
@@ -37,6 +93,9 @@ skill_attr:
   器械: int
   撬锁: dex
   意志: wis
+
+# 敌人威胁档 → 数值、幕次加成：**已搬到 `rules/combat.yaml`**（S1-1，战斗数值唯一真相源）。
+# 那里还有命中集合、伤害公式、防御减免；这里只留判定相关的通用表。
 
 # 技能 -> 行动类型（决定 base DC）
 skill_action_type:

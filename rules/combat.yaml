@@ -1,0 +1,53 @@
+# 战斗数值（**唯一真相源**）：命中集合 / 伤害公式 / 防御减免 / 敌人威胁折算。
+#
+# 纪律（AGENTS.md「数值真相源」）：代码只读不算；要改战斗手感就改这里，不改代码。
+# 本文件是 S1-1 从 `trpg/combat/engine.py` 硬编码搬来的，**默认值逐值未变**（golden 不变）。
+#
+# 结构：
+#   hit_outcomes  哪些判定结果算「打中了」
+#   attack        玩家攻击：骰面 / 最低伤害 / 暴击倍率
+#   defend        防御：减伤 / 持续回合
+#   enemy         敌人：申报值夹取区间 / 威胁档折算 / 幕次加成
+
+# 命中集合：crit_success / success / fail_forward 算命中，failure 不中
+hit_outcomes: [crit_success, success, fail_forward]
+
+attack:
+  # 伤害 = 武器 atk 合计 + 1d<dice> − 敌人 def，最后不低于 min_damage
+  dice: 6
+  min_damage: 1
+  # 暴击（crit_success）时伤害乘以 crit_multiplier
+  crit_multiplier: 2
+
+defend:
+  # 进入防御后，本回合受到的伤害减少 reduction
+  reduction: 2
+  duration_turns: 1
+
+enemy:
+  # GM 申报的具体数值会被夹到 [min, max]，防止一句话造出离谱的怪
+  clamp:
+    min: 1
+    max: 30
+  # 威胁档 → 基础数值（GM 只申报「多危险」，具体数字由代码折算）
+  threat:
+    weak:   {hp: 2, atk: 1, def: 0}
+    normal: {hp: 4, atk: 2, def: 1}
+    strong: {hp: 7, atk: 3, def: 2}
+    boss:   {hp: 12, atk: 4, def: 3}
+  # 未知威胁档回落到哪一档
+  default_threat: normal
+  # 幕次加成：越往后敌人越硬
+  #   hp  = 基础 hp + bonus
+  #   atk = 基础 atk + bonus // atk_bonus_divisor
+  #   def = 基础 def + def_bonus_amount（从 def_bonus_from_stage 幕起）
+  threat_stage_bonus: {1: 0, 2: 1, 3: 2, 4: 3}
+  atk_bonus_divisor: 2
+  def_bonus_from_stage: 3
+  def_bonus_amount: 1
+  # 折算后的下限（atk / def 不会变成负数）
+  floors:
+    atk: 0
+    def: 0
+  # 敌人身上最多带几个标签（超出即丢）
+  tag_limit: 3

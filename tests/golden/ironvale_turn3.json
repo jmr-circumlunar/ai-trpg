@@ -1,0 +1,71 @@
+[
+  {
+    "turn": 1,
+    "actors": [
+      "chr_p1",
+      "chr_p2",
+      "chr_p3"
+    ],
+    "actions": [
+      "用 观察 试探前面的情况",
+      "用 交涉 试探前面的情况",
+      "用 攀爬 试探前面的情况"
+    ],
+    "outcomes": [
+      "failure (4 vs 11)",
+      "failure (0 vs 14)",
+      "failure (8 vs 12)"
+    ],
+    "rejected": [],
+    "deaths": [],
+    "loot": [],
+    "path_changes": [],
+    "version": 2
+  },
+  {
+    "turn": 2,
+    "actors": [
+      "chr_p1",
+      "chr_p2",
+      "chr_p3"
+    ],
+    "actions": [
+      "用 交涉 试探前面的情况",
+      "用 撬锁 试探前面的情况",
+      "用 潜行 试探前面的情况"
+    ],
+    "outcomes": [
+      "failure (7 vs 13)",
+      "failure (12 vs 16)",
+      "fail_forward (8 vs 9)"
+    ],
+    "rejected": [],
+    "deaths": [],
+    "loot": [],
+    "path_changes": [],
+    "version": 4
+  },
+  {
+    "turn": 3,
+    "actors": [
+      "chr_p1",
+      "chr_p2",
+      "chr_p3"
+    ],
+    "actions": [
+      "用 潜行 试探前面的情况",
+      "用 撬锁 试探前面的情况",
+      "用 撬锁 试探前面的情况"
+    ],
+    "outcomes": [
+      "fail_forward (7 vs 9)",
+      "success (22 vs 16)",
+      "failure (7 vs 14)"
+    ],
+    "rejected": [],
+    "deaths": [],
+    "loot": [],
+    "path_changes": [],
+    "version": 6
+  }
+]

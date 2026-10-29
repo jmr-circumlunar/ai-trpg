@@ -3,6 +3,10 @@
 - MiniMaxEmbedder：`POST /v1/embeddings {"model":"embo-01","texts":[...],"type":"db|query"}`
   注意 MiniMax 的参数名是 `texts`、且有 `type` 区分文档/查询，和 OpenAI 不同。
 - HashEmbedder：离线降级实现（字符 n-gram 哈希），保证测试与断网时链路不断。
+
+doc: 03-模块/M11-记忆/00-模块总述.md
+module: M11
+layer: L2
 """
 
 from __future__ import annotations
@@ -11,7 +15,8 @@ import hashlib
 import math
 from typing import Protocol
 
-from ..llm.http import post_json
+# 注意：`..llm` 在导入期会反向引用 `memory`（agent → recall → vector_store），
+# 顶层 import 会形成循环。放在调用处延迟导入即可打破环。
 
 
 class Embedder(Protocol):
@@ -39,6 +44,7 @@ class MiniMaxEmbedder:
         self.tokens = 0
 
     def embed(self, texts: list[str], kind: str = "db") -> list[list[float]]:
+    
         if not texts:
             return []
         out: list[list[float]] = []
@@ -62,6 +68,23 @@ class MiniMaxEmbedder:
             self.tokens += int(data.get("total_tokens") or 0)
             out.extend(vectors)
         return out
+
+    def probe(self) -> int:
+        """探活 + 维度自检。返回实际维度；失败抛异常（调用方决定是否降级）。"""
+        vecs = self.embed(["探活：雨夜的码头"], kind="query")
+        if not vecs:
+            raise RuntimeError("embedding 探活失败：返回空向量")
+        dim = len(vecs[0])
+        if self.dim and dim != self.dim:
+            raise RuntimeError(f"embedding 维度漂移：{self.dim} → {dim}")
+        self.dim = dim
+        return dim
+
+
+def probe_minimax_embedder(api_key: str, base_url: str, model: str = "embo-01") -> int:
+    """探活：真调一次，返回维度。失败直接抛——静默降级是「记不住」的根源。"""
+    emb = MiniMaxEmbedder(api_key, base_url=base_url, model=model)
+    return emb.probe()
 
 
 class HashEmbedder:

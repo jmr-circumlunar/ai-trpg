@@ -3,12 +3,12 @@
 import json
 from pathlib import Path
 
-from trpg.llm import AgentLLM, LLMConfig
-from trpg.llm.providers.base import ChatResult
+from trpg.agents import AgentLLM, LLMConfig
+from trpg.agents.providers.base import ChatResult
 from trpg.memory import HashEmbedder, VectorStore, cosine, hybrid_recall
 from trpg.models.memory import CharacterEvent
 from trpg.storage.memory import EventStore
-from trpg.testing import make_card, make_state
+from support.builders import make_card, make_state
 
 ROOT = Path(__file__).resolve().parents[1]
 EMB = HashEmbedder(dim=256)

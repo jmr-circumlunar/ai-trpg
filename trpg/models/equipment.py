@@ -1,4 +1,10 @@
+"""doc: 03-模块/M01-数据模型/00-模块总述.md
+module: M01
+layer: L0
+"""
 from __future__ import annotations
+
+from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -22,6 +28,11 @@ class EquipmentInstance(BaseModel):
     req_level: int = Field(default=1, ge=1, le=10)
     attrs: dict[str, int] = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
+    # 词缀（S6-1）：`[{id, label, value, effect}]` —— 词缀 × 槽位 × 品阶 三维限定。
+    # 缺省空列表 = 不带词缀（旧装备结构不变）。
+    affixes: list[dict[str, Any]] = Field(default_factory=list)
+    # 自定义扩展字段：**键名由世界包声明**（框架不塞世界语义），不在白名单内的键不会进来。
+    extra: dict[str, Any] = Field(default_factory=dict)
     name_flavor: str = ""
     source: EquipmentSource = Field(default_factory=EquipmentSource)
     owner_id: str | None = None

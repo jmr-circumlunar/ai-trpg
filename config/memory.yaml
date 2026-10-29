@@ -15,6 +15,40 @@ recall:
   important_threshold: 7 # 重要度阈值（1~10，>= 才进 important）
   recent_limit: 5        # 结构化候选里"最近的事"取几条
   rrf_k: 60              # RRF 平滑常数（越大越平缓）
+  # 向量候选阈值：不设阈值时 top_k 恒满，"不相关"的记忆也会被当成回忆
+  # 0.30 而非 0.45：embo-01 对中文改写的判别偏弱，实测相关条落 0.45~0.79，
+  # 阈值定太高会把真正相关的那条也砍掉。宁可控量少，不要错杀。
+  vector_min_score: 0.30 # 绝对阈值（0 = 不过滤）
+  vector_rel_margin: 0.08 # 相对阈值：低于 top1 这么多直接丢
+
+  # ── S5-2 三因子打分 + 矛盾检测 ──────────────────────────────
+  # 缺省 scoring_mode: rrf → 仍走原 RRF 路径，**行为零变化**；
+  # 改成 three_factor 才启用「时衰 + 重要度 + 相关性」加权排序。
+  scoring_mode: rrf        # rrf | three_factor
+  weight_relevance: 0.6    # 相关性（向量余弦；结构化候选用下面的兜底值）
+  weight_importance: 0.2  # 重要度（写入时打的 1~10 分）
+  weight_recency: 0.2     # 时衰（越近越高）
+  half_life_turns: 20      # 时衰半衰期（回合）；<=0 表示不衰减
+  importance_scale: 10    # 重要度归一化分母
+  structured_relevance: 0.5 # 结构化候选（重要/最近）的兜底相关度
+  conflict_enabled: 0      # 矛盾标记开关（1 = 标冲突，不覆盖）
+  conflict_min_diff_chars: 2     # 两条摘要差异片段的最小长度
+  conflict_min_shared_prefix: 2  # 中文无空格时靠公共前缀抓「同一个人」
 
 agent:
   max_steps: 3           # ReAct 最多几轮（调大可看更多思考，费 token）
+
+# ── S5-3 反思层（巩固）：每 N 回合把多条记忆合并成高阶结论 ──────
+# 触发条件二选一：回合到倍数 **或** 最近事件累计重要度越阈值。
+# every_n = 0 且 threshold = 0 → 反思层关闭（缺省行为零变化）。
+consolidation:
+  every_n: 0            # 每 N 回合巩固一次（0 = 关闭）
+  threshold: 0          # 最近事件累计重要度越阈值也触发（0 = 关闭）
+  min_cluster: 2        # 一簇至少几条才算「多条」（一条不算）
+
+# ── S5-3 Lorebook 词条触发（与语义检索并存）────────────────────
+# 词条内容在世界包 worlds/<id>/lorebook.yaml（**内容，不是框架常量**）；
+# 没有该文件或没命中关键词 → 不注入。
+lorebook:
+  max_entries: 3        # 一次最多注入几条词条
+  scan_depth: 2         # 默认往回扫几条回合文本（条目可用 scan_depth 覆盖）

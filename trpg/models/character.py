@@ -1,3 +1,7 @@
+"""doc: 03-模块/M01-数据模型/00-模块总述.md
+module: M01
+layer: L0
+"""
 from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
@@ -20,9 +24,19 @@ class ModelConfig(BaseModel):
 
 
 class AIExtended(BaseModel):
-    """`data.extensions.ai_trpg`：本项目扩展，绝不散落到 data 顶层。"""
+    """`data.extensions.ai_trpg`：本项目扩展，绝不散落到 data 顶层。
 
-    profession: str
+    职业三层（HANDOFF §6-12）：
+    - `origin`：出身（血统/种姓/家世），开局定，正常不可变
+    - `talents`：天赋标签，开局定（出身自带 + 天赋池抽取）
+    - `path`：身份，可由剧情授予（运行时真值在 `CharacterRuntime.path`）
+    - `profession`：旧世界的单层职业字段，保留兼容；有 origin 的世界只作显示用
+    """
+
+    profession: str = ""
+    origin: str = ""
+    path: str = ""
+    talents: list[str] = Field(default_factory=list)
     affiliation: str | None = None
     origin_region: str | None = None
     level: int = Field(default=1, ge=1, le=10)
@@ -41,6 +55,8 @@ class AIExtended(BaseModel):
     bottom_line: str = ""
 
     equipment: list[EquipmentInstance] = Field(default_factory=list)
+    # 局外带入的物品清单（**只带 id**，不带数值实例；见 growth/carry.py）
+    carried: list[str] = Field(default_factory=list)
     scars: list[dict] = Field(default_factory=list)
     echo: int = 0
     wear: int = 0
@@ -53,6 +69,17 @@ class AIExtended(BaseModel):
             if not 3 <= val <= 18:
                 raise ValueError(f"属性 {key}={val} 越界（3~18）")
         return v
+
+    @field_validator("talents")
+    @classmethod
+    def _talents_clean(cls, v: list[str]) -> list[str]:
+        """去空、去重、保序：天赋是标签，重复没有意义。"""
+        out: list[str] = []
+        for item in v:
+            text = str(item).strip()
+            if text and text not in out:
+                out.append(text)
+        return out
 
     @field_validator("hp")
     @classmethod

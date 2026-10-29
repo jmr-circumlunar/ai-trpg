@@ -7,12 +7,12 @@ import pytest
 
 from trpg.engine.loop import GameLoop
 from trpg.engine.state_merge import DeltaValidationError, apply_delta
-from trpg.llm import MockLLM
+from trpg.agents import MockLLM
 from trpg.models import CharacterRuntime, Clock, DeltaChange, GameState, Party, Scene, StateDelta, WorldRef
 from trpg.models.enums import DeltaOp
-from trpg.rules import clock as clock_mod
+from trpg.clock import core as clock_mod
 from trpg.rules.loader import Rules
-from trpg.testing import make_card
+from support.builders import make_card
 
 ROOT = Path(__file__).resolve().parents[1]
 CFG = Rules(ROOT).clock

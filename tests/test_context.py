@@ -5,14 +5,18 @@ import json
 from pathlib import Path
 
 from trpg.engine.loop import GameLoop
-from trpg.llm import AgentLLM, LLMConfig, MockLLM
-from trpg.llm.agent import SUMMARY_EVERY, SUMMARY_KEEP
-from trpg.llm.providers.base import ChatResult
+from trpg.agents import AgentLLM, LLMConfig, MockLLM
+from trpg.memory.settings import MemorySettings
+from trpg.agents.providers.base import ChatResult
 from trpg.models import CharacterRuntime, GameState, Party, Scene, WorldRef
 from trpg.rules.loader import Rules
-from trpg.testing import make_card, make_state
+from support.builders import make_card, make_state
 
 ROOT = Path(__file__).resolve().parents[1]
+# 摘要周期与保留条数的唯一真相在 config/memory.yaml，代码里不再有第二份常量
+_SETTINGS = MemorySettings.load(ROOT)
+SUMMARY_EVERY = _SETTINGS.summary_every
+SUMMARY_KEEP = _SETTINGS.chapter_keep
 
 
 def _loop(llm) -> GameLoop:

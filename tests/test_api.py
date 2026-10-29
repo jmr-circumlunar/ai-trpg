@@ -88,7 +88,9 @@ def test_resume_missing_returns_404():
 def test_index_page():
     r = client.get("/")
     assert r.status_code == 200
-    assert "IRONVALE" in r.text
+    # 新前端是运行时渲染（HTML 里只有挂载点 #app），旧静态页把元素写死在 HTML 里；
+    # 两条路径都要能开。
+    assert 'id="app"' in r.text or "IRONVALE" in r.text
 
 
 def test_characters_page():

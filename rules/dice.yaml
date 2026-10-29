@@ -1,0 +1,52 @@
+# 骰型注册表：名字与参数在 yaml，机制在代码（trpg/rules/dice_types.py）
+#
+# 为什么要它：以前只会解析 `NdS±M`，玩法要换骰子就得改代码。
+# 现在「骰型」是注册表里的一条声明：名字 + 参数 + 机制 kind。
+# 缺省仍然只走旧路径（`NdS±M`），行为逐字节不变。
+schema_version: 1
+
+# 全局约束（不是玩法数值，是引擎护栏）
+limits:
+  max_count: 20        # 单次最多掷多少颗骰
+  min_sides: 2         # 骰子最少几面
+  max_sides: 1000      # 骰子最多几面
+  max_explode_rounds: 50  # 爆炸骰单颗最多重掷多少轮（防死循环）
+
+# 骰型注册表：kind 对应代码里的机制，其余是参数
+types:
+  basic:
+    kind: basic
+    label: 基础骰
+    # 表达式形如 `2d6` / `d20+5`；加值在代码里算，参数只声明「允许的形态」
+    allow_modifier: true
+
+  pool:
+    kind: pool
+    label: 池运算
+    # 掷 count 颗，保留 keep_mode 指定的 keep 颗（其余丢弃）
+    count: 3
+    keep_mode: highest   # highest | lowest
+    keep: 3
+
+  success_count:
+    kind: success_count
+    label: 条件成功计数
+    # 结果 >= threshold 的骰子各记一次成功，total = 成功次数
+    count: 3
+    threshold: 5
+
+  explode:
+    kind: explode
+    label: 爆炸骰
+    # threshold 为空 = 掷出最大值即爆炸；否则结果 >= threshold 触发
+    threshold: null
+    count: 1
+    # 单颗骰最多重掷多少轮（超了按当前值收尾）
+    max_rounds: 50
+
+# 结果档位映射（d20 的成功分档）：数值在这里，代码只查表
+bands:
+  - {name: 大成功, min: 18, max: 20}
+  - {name: 成功, min: 10, max: 17}
+  - {name: 失败, min: 2, max: 9}
+  - {name: 大失败, min: 1, max: 1}

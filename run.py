@@ -19,15 +19,18 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 # Windows 控制台默认 GBK，中文会乱码
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
-    except Exception:
-        pass
+for _stream in ("stdout", "stderr"):
+    _s = getattr(sys, _stream, None)
+    if hasattr(_s, "reconfigure"):
+        try:
+            _s.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+        except Exception:
+            pass
 
 from trpg.engine.loop import GameLoop  # noqa: E402
 from trpg.game import (  # noqa: E402
     build_cards,
+    build_director,
     build_llm,
     build_memory,
     build_state,
@@ -56,6 +59,21 @@ def cmd_worlds(_: argparse.Namespace) -> int:
             f" | seeds: {len(pack.seeds)} items: {len(pack.items)} npcs: {len(pack.npcs)}"
         )
     return 0
+
+
+def _has_combat_or_judge(pack) -> bool:
+    """这个世界有「血量」这个维度吗？
+
+    有战斗或判定的世界（传统跑团）才有 HP 的语义；纯信息对抗局里 HP 恒等于初值，
+    展示它只会掩盖真正的生死状态（`position == dead`）。
+    """
+    try:
+        from trpg.rulespack import assemble
+
+        caps = assemble(pack)
+        return caps.has("combat") or caps.has("judge")
+    except Exception:  # noqa: BLE001  装配失败时按「有」处理（信息更全）
+        return True
 
 
 def cmd_run(args: argparse.Namespace) -> int:
@@ -101,8 +119,30 @@ def cmd_run(args: argparse.Namespace) -> int:
         f" turns={turns} players={args.players}\n"
     )
 
+    director = build_director(
+        ROOT,
+        rules,
+        pack,
+        cards,
+        args.provider,
+        args.seed,
+        args.model,
+        args.reasoning_effort,
+    )
     loop = GameLoop(
-        rules, cards, state, llm, seed=args.seed, conn=conn, events=store, vectors=vectors
+        rules,
+        cards,
+        state,
+        llm,
+        seed=args.seed,
+        conn=conn,
+        force_seed=args.force_seed,
+        events=store,
+        vectors=vectors,
+        pack=pack,
+        director=director,
+        # 默认 LangGraph；`--engine manual` 可切回手写 for 循环做对照排查
+        engine=getattr(args, "engine", "graph"),
     )
     records = asyncio.run(loop.run(turns))
 
@@ -151,7 +191,16 @@ def cmd_run(args: argparse.Namespace) -> int:
         f"游戏时间    第 {_c.day} 天 {_c.hour:02d}:{_c.minute:02d}"
         f"（{rules.phase_label(rules.phase_of(_c.hour))}）"
     )
-    print(f"HP          {hp_line}")
+    # HP 只在有战斗/判定的世界才展示：狼人杀这类纯信息对抗局里 HP 恒等于初值，
+    # 打出来是噪音（实测 6 回合全是 11，反而让人以为「没打中」）。
+    # 那种世界改看出局名单——那才是它们真正的生死状态。
+    if _has_combat_or_judge(pack):
+        print(f"HP          {hp_line}")
+    else:
+        from trpg.models.state import is_eliminated
+
+        out = [cid for cid, rt in loop.state.characters.items() if is_eliminated(rt)]
+        print(f"出局        {'、'.join(out) or '无'}")
     print(f"判定分布    {dict(counter)}")
     print(f"骰子状态    {loop.dice.rng_state}")
     from trpg.memory import MemorySettings  # noqa: PLC0415
@@ -178,10 +227,52 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     if conn is not None:
         print(f"落库        {Path(args.db).resolve()}")
-        db.save_state(conn, loop.state)
+        # 带上回合号：trace / reset 都靠 world_state.turn 找快照
+        db.save_state(conn, loop.state, loop.next_turn - 1)
+        # 局末经验提炼：与 API 的 `_finish` 共用 `reflect_all`。
+        # 不在这里做的话，CLI 跑出来的局**永远学不到东西**（实测 6 回合后表是空的）。
+        from trpg.engine.reflection import char_to_agent, reflect_all
+
+        learned = reflect_all(
+            loop,
+            records,
+            f"第 {len(records)} 回合结束，胜者：{loop.state.winner or '未决'}",
+            char_to_agent(loop.cards, pack.world_id),
+            conn,
+            pack.world_id,
+            pack=pack,
+        )
+        if learned:
+            print(f"经验        写入 {learned} 条")
         conn.close()
 
     return 0
+
+
+def cmd_eval(args) -> int:
+    """评测子命令（S3-2）：把参数转交给 `trpg.eval` 的 CLI，退出码原样透传。
+
+    为什么不重复实现：评测逻辑全在 `trpg/eval/`（纯内存、离线），
+    这里只做**入口**——一份参数、一套退出码语义（0 成功 / 非 0 失败）。
+    """
+    from trpg.eval.cli import main as eval_main
+
+    argv = [args.cmd]
+    for flag, value in (
+        ("--world", args.world),
+        ("--players", args.players),
+        ("--games", args.games),
+        ("--seed", args.seed),
+        ("--provider", args.provider),
+        ("--turns", args.turns),
+        ("--hostile-camps", args.hostile_camps),
+    ):
+        argv.extend([flag, str(value)])
+    if args.no_baseline:
+        argv.append("--no-baseline")
+    if hasattr(args, "format"):
+        argv.extend(["--format", args.format])
+    return int(eval_main(argv))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -198,6 +289,12 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--turns", type=int, default=None, help="回合数（真实模型默认 3）")
     run.add_argument("--players", type=int, default=4)
     run.add_argument("--world", default="ironvale", help="worlds/<id>/ 里的世界包")
+    run.add_argument(
+        "--engine",
+        default="graph",
+        choices=("graph", "manual"),
+        help="回合调度器：graph=LangGraph（默认），manual=手写 for 循环（排错对照用）",
+    )
     run.add_argument("--era", default=None, help="覆盖世界包默认 era")
     run.add_argument("--model", default=None, help="覆盖默认模型名")
     run.add_argument(
@@ -208,10 +305,44 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--quiet", action="store_true", help="只打印判定，不打印叙事")
     run.add_argument("--db", default="run.db")
     run.add_argument("--no-db", action="store_true")
+    run.add_argument(
+        "--force-seed",
+        default="",
+        help="调试：第 1 回合强制使用指定事件种子 id（如 evt_first_field 验证战斗链路）",
+    )
     run.set_defaults(func=cmd_run)
 
     worlds = sub.add_parser("worlds", help="列出可用世界包")
     worlds.set_defaults(func=cmd_worlds)
+
+    # 评测三件套（S3-2）：arena / leaderboard / calibrate
+    # 纯内存、离线可跑（mock provider 不需要 key），可进 CI。
+    for name, help_text in (
+        ("arena", "跑一批对局并出指标（含随机基线对照）"),
+        ("leaderboard", "每 agent 胜率排行（默认 Markdown）"),
+        ("calibrate", "怀疑度校准报告"),
+    ):
+        p = sub.add_parser(name, help=help_text)
+        p.add_argument("--world", default="ironvale", help="世界包 id（框架不认世界名）")
+        p.add_argument("--players", type=int, default=8)
+        p.add_argument("--games", type=int, default=4)
+        p.add_argument("--seed", default="42", help="随机种子（同 seed 同结果）")
+        p.add_argument("--provider", default="mock", help="mock | auto | 具体 provider")
+        p.add_argument("--turns", type=int, default=6)
+        p.add_argument(
+            "--hostile-camps",
+            default="",
+            help="敌对阵营 id（空格分隔，来自世界包词表）",
+        )
+        p.add_argument("--no-baseline", action="store_true", help="不跑随机基线")
+        if name == "leaderboard":
+            p.add_argument(
+                "--format",
+                default="markdown",
+                choices=("markdown", "json"),
+                help="输出格式（默认 Markdown，可直接落知识库）",
+            )
+        p.set_defaults(func=cmd_eval)
 
     args = parser.parse_args(argv)
     return args.func(args)

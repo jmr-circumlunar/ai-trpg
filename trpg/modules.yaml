@@ -1,0 +1,225 @@
+# 模块与依赖的**机器可读单一真相**。
+#
+# 三处编号必须一致：本文件 `id` ←→ 知识库 `03-模块/Mxx-xxx/` ←→ 代码包 `packages`
+# 校验命令：.venv\Scripts\python.exe tools\check_docs.py
+#
+# 层（layer）决定「谁能 import 谁」：只允许由低层指向高层。
+#   L0 公共设施 → L1 纯规则 → L2 基础服务 → L3 玩法 → L4 编排 → L5 智能 → L6 外壳 → L7 旁挂
+version: 1
+project: ai-trpg
+vault_root: 07-AI项目/AI跑团
+
+# 不属于任何模块的公共包（谁都能依赖，自身只依赖标准库/第三方）
+platform:
+  - package: trpg/net
+    layer: L0
+    why: 最小 HTTP 客户端；memory 与 agents 共用，抽出来消除 memory→agents 的向上依赖
+
+# 装配层：只允许 api / ops / run.py 引用
+assembly:
+  - path: trpg/game.py
+    layer: L6
+    why: 把各模块拼起来（注入依赖），不承载玩法逻辑
+
+# 同层白名单：只允许这些同层依赖，其余同层 import 视为违规
+whitelist:
+  - [M10, M08]     # 建卡发初始装备（growth.build → equipment.roll）
+  - [M06, M02]     # 时间编排用到 rules 的时间纯函数
+  - [M02, M06]     # 规则加载器反过来用时间纯函数（rules.loader → clock.core）
+  - [M14, M15]     # 外壳调用运维探活（api → ops.health_snapshot）
+  - [M18, M05]     # 装配器读世界包声明（assemble → pack.systems_declaration）；反方向禁止
+
+modules:
+  - id: M01
+    name: 数据模型
+    layer: L0
+    packages: [trpg/models]
+    doc: 03-模块/M01-数据模型/00-模块总述.md
+    exposes: [GameState, CharacterCard, PlayerAction, StateDelta, enums]
+    depends_on: []
+    status: 生效
+
+  - id: M02
+    name: 规则与判定
+    layer: L1
+    packages: [trpg/rules]
+    doc: 03-模块/M02-规则与判定/00-模块总述.md
+    exposes: [DiceEngine, Rules, judge, immersion]
+    depends_on: [M01]
+    status: 生效
+
+  - id: M03
+    name: 存储
+    layer: L2
+    packages: [trpg/storage]
+    doc: 03-模块/M03-存储/00-模块总述.md
+    exposes: [db, CharacterRepo, EventStore]
+    depends_on: [M01]
+    status: 生效
+
+  - id: M04
+    name: 配置
+    layer: L0
+    packages: [trpg/config]
+    doc: 03-模块/M04-配置/00-模块总述.md
+    exposes: [load_yaml, config_path]
+    depends_on: []
+    status: 生效
+
+  - id: M05
+    name: 世界包
+    layer: L2
+    packages: [trpg/world]
+    doc: 03-模块/M05-世界包/00-模块总述.md
+    exposes: [WorldPack, load_world, discover_worlds]
+    depends_on: [M01, M04]
+    status: 生效
+
+  - id: M06
+    name: 时间
+    layer: L1
+    packages: [trpg/clock]
+    doc: 03-模块/M06-时间/00-模块总述.md
+    exposes: [advance, phase_of, date_label]
+    depends_on: [M02]
+    status: 生效
+
+  - id: M07
+    name: 地图与空间
+    layer: L3
+    packages: [trpg/map]
+    doc: 03-模块/M07-地图与空间/00-模块总述.md
+    exposes: [generate_region_map, exits_for, is_adjacent, node_label]
+    # M01：地图生成用 `models.rng.derive_parts` 派生随机（统一入口）
+    depends_on: [M01, M05]
+    status: 生效
+
+  - id: M08
+    name: 装备与物品
+    layer: L3
+    packages: [trpg/equipment]
+    doc: 03-模块/M08-装备与物品/00-模块总述.md
+    exposes: [roll, promote]
+    depends_on: [M01]
+    status: 生效
+
+  - id: M09
+    name: 战斗
+    layer: L3
+    packages: [trpg/combat]
+    doc: 03-模块/M09-战斗/00-模块总述.md
+    exposes: [engine]
+    depends_on: [M01, M02, M08]
+    status: 生效
+
+  - id: M10
+    name: 成长
+    layer: L3
+    packages: [trpg/growth]
+    doc: 03-模块/M10-成长/00-模块总述.md
+    exposes: [build, identity, apply, Wallet, MetaHooks]
+    # M04：建卡要读全局人格库 `config/agents.yaml`（人格与身份解耦，方案 34）
+    depends_on: [M01, M02, M03, M04, M05, M08]
+    status: 生效
+
+  - id: M11
+    name: 记忆
+    layer: L2
+    packages: [trpg/memory]
+    doc: 03-模块/M11-记忆/00-模块总述.md
+    exposes: [MemoryBackend, hybrid_recall, VectorStore]
+    depends_on: [M01, M03, M04]
+    status: 生效
+
+  - id: M12
+    name: Agent与交互
+    layer: L5
+    packages: [trpg/agents]
+    doc: 03-模块/M12-Agent与交互/00-模块总述.md
+    exposes: [AgentLLM, Director, _TOOLS, AgentLLM.spec]
+    # M08：prompt 里的装备 slot 词表从 `equipment.roll.SLOT_CLASS` 生成（不再手写第二份）
+    depends_on: [M01, M02, M03, M04, M05, M06, M08, M11, M13, M18]
+    status: 生效
+
+  - id: M13
+    name: 回合编排
+    layer: L4
+    packages: [trpg/engine]
+    doc: 03-模块/M13-回合编排/00-模块总述.md
+    exposes: [GameLoop, apply_delta, TurnRecord]
+    depends_on: [M01, M02, M03, M04, M06, M07, M08, M09, M10, M12, M18]
+    status: 生效
+
+  - id: M14
+    name: 接口与前端
+    layer: L6
+    packages: [trpg/api]
+    doc: 03-模块/M14-接口与前端/00-模块总述.md
+    exposes: [app, routes]
+    # M04：大厅 / 房间页要读全局人格库 `config/agents.yaml`（方案 35）
+    depends_on: [M01, M02, M03, M04, M05, M06, M07, M08, M10, M12, M13, M18]
+    status: 生效
+
+  - id: M15
+    name: 运维与部署
+    layer: L7
+    packages: [trpg/ops]
+    doc: 03-模块/M15-运维与部署/00-模块总述.md
+    exposes: [health_snapshot]
+    depends_on: [M03]
+    status: 生效
+
+  # ── 预留（先写后实现）：代码包尚未建立，只占编号与依赖位 ──
+  - id: M16
+    name: 可观测与评测
+    layer: L7
+    packages: [trpg/eval]
+    doc: 03-模块/M16-可观测与评测/00-模块总述.md
+    exposes: [metrics, eval]
+    depends_on: [M01, M02, M03, M05, M12, M13, M18]
+    status: 生效
+
+  - id: M17
+    name: 世界包工坊
+    layer: L1
+    packages: [trpg/workshop]
+    doc: 03-模块/M17-世界包工坊/00-模块总述.md
+    exposes: [validate_world, scaffold_world, diff_world]
+    depends_on: [M02, M05]
+    status: 待实现
+
+  - id: M18
+    name: 规则包与能力包
+    layer: L2
+    packages: [trpg/rulespack]
+    doc: 03-模块/M18-规则包与能力包/00-模块总述.md
+    exposes: [manifest, CapabilitySet, assemble, explain, validate_declarations, evaluate]
+    depends_on: [M01, M05, M06]
+    status: 生效
+
+  - id: M19
+    name: 剧情导演
+    layer: L3
+    packages: []
+    doc: 03-模块/M19-剧情导演/00-模块总述.md
+    exposes: [Director.plan, Director.advance]
+    depends_on: [M05, M06, M13]
+    status: 待实现
+
+  - id: M20
+    name: 联机与席位
+    layer: L6
+    packages: []
+    doc: 03-模块/M20-联机与席位/00-模块总述.md
+    exposes: [Room, Seat]
+    depends_on: [M03, M13, M14]
+    status: 待实现
+
+  - id: M21
+    name: 平衡实验与回放
+    layer: L7
+    packages: []
+    doc: 03-模块/M21-平衡实验与回放/00-模块总述.md
+    exposes: [simulate, replay]
+    depends_on: [M02, M12, M13, M16]
+    status: 待实现

@@ -1,0 +1,25 @@
+﻿# 能力包声明（S6-4）
+#
+# 能力包可叠加覆盖：每个包声明 priority（数字大者覆盖小者；相同则链上靠后者胜）。
+# 覆盖链的合并结果由代码回写到 data/abilities/merged/abilities.yaml（运行时不写 worlds）。
+# 解锁树用命名引用（unlocks[].requires 只写 id，不做表达式）。
+schema_version: 1
+
+abilities:
+  - id: base
+    priority: 0
+    unlocks:
+      - id: u_start
+        requires: []
+      - id: u_path_1
+        requires: [u_start]
+      - id: u_path_2
+        requires: [u_path_1]
+
+  - id: extra
+    priority: 10
+    unlocks:
+      - id: u_path_2
+        requires: [u_path_1]
+      - id: u_secret
+        requires: [u_path_2]

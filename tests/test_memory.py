@@ -6,12 +6,12 @@ import sqlite3
 from pathlib import Path
 
 from trpg.engine.loop import GameLoop
-from trpg.llm import AgentLLM, LLMConfig, MockLLM
-from trpg.llm.providers.base import ChatResult
+from trpg.agents import AgentLLM, LLMConfig, MockLLM
+from trpg.agents.providers.base import ChatResult
 from trpg.models.memory import CharacterEvent
 from trpg.storage import db
 from trpg.storage.memory import EventStore
-from trpg.testing import make_card, make_state
+from support.builders import make_card, make_state
 from trpg.models import CharacterRuntime, GameState, Party, Scene, WorldRef
 from trpg.rules.loader import Rules
 

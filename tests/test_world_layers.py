@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from trpg.game import seed_lore
-from trpg.llm import prompts
+from trpg.agents import prompts
 from trpg.memory import HashEmbedder, VectorStore, hybrid_recall
 from trpg.storage.memory import EventStore
 from trpg.world import load_world

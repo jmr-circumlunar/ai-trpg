@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from trpg.llm import AgentLLM, LLMConfig, extract_json
-from trpg.llm.providers import MiniMaxAdapter
-from trpg.llm.providers.base import ChatResult
+from trpg.agents import AgentLLM, LLMConfig, extract_json
+from trpg.agents.providers import MiniMaxAdapter
+from trpg.agents.providers.base import ChatResult
 from trpg.models import ModelConfig
-from trpg.testing import make_card, make_state
+from support.builders import make_card, make_state
 
 ROOT = Path(__file__).resolve().parents[1]
 

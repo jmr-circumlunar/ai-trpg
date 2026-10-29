@@ -64,4 +64,4 @@ tools/import_env.py          从已有 .env 导入配置（不打印密钥）
 ## 世界包
 
 `worlds/<world_id>/` 一个目录即一个世界，需含 `world.yaml` / `eras/` / `regions/` / `seeds.yaml` / `items.yaml` / `npcs.yaml`。
-模板见 `worlds/_template/`。基于他人作品的世界包请勿提交到公开仓库（见 `.gitignore`）。
+模板见 `worlds/_blank/`（唯一模板，字段说明与预设见该目录 `README.md`）。基于他人作品的世界包请勿提交到公开仓库（见 `.gitignore`）。

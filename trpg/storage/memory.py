@@ -5,6 +5,10 @@
 - 可选 SQLite 持久化（供 trace / 跨局 / 重启后回忆）
 
 **隔离靠物理过滤**：所有查询都带 `char_id`，不是靠 prompt 说"只用自己的记忆"。
+
+doc: 03-模块/M03-存储/00-模块总述.md
+module: M03
+layer: L2
 """
 
 from __future__ import annotations
@@ -41,6 +45,9 @@ class EventStore:
                     event.importance,
                 ),
             )
+            # 必须提交：不提交会让这个连接一直持有写锁，
+            # 同一服务再开第二局时就会 "database is locked"
+            self.conn.commit()
 
     # ── 读取（全部带 char_id 过滤）──────────────────────────
     def _own(self, char_id: str) -> list[CharacterEvent]:

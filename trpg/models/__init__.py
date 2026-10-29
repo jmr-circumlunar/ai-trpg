@@ -1,7 +1,13 @@
+"""doc: 03-模块/M01-数据模型/00-模块总述.md
+module: M01
+layer: L0
+"""
 from .action import JudgeResult, PlayerAction
+from .belief import Mindset, SelfBelief, Suspicion
 from .character import AIExtended, CardData, CardExtensions, CharacterCard, ModelConfig
 from .enums import (
     AgentRole,
+    CombatMode,
     Controller,
     DeltaOp,
     Intent,
@@ -17,6 +23,7 @@ from .state import (
     CharacterRuntime,
     Clock,
     DeltaChange,
+    Enemy,
     Exit,
     GameState,
     Party,
@@ -34,17 +41,20 @@ __all__ = [
     "CharacterCard",
     "CharacterRuntime",
     "Clock",
+    "CombatMode",
     "Controller",
     "DeltaChange",
     "DeltaOp",
     "EquipmentInstance",
     "EquipmentSource",
+    "Enemy",
     "Exit",
     "GameState",
     "Intent",
     "JudgeResult",
     "LedgerKind",
     "MemoryScope",
+    "Mindset",
     "ModelConfig",
     "Outcome",
     "Party",
@@ -53,7 +63,9 @@ __all__ = [
     "Quality",
     "Quest",
     "Scene",
+    "SelfBelief",
     "SourceKind",
     "StateDelta",
+    "Suspicion",
     "WorldRef",
 ]

@@ -5,11 +5,11 @@ import json
 from pathlib import Path
 
 from trpg.engine.loop import GameLoop
-from trpg.llm import AgentLLM, LLMConfig, MockLLM
-from trpg.llm.providers.base import ChatResult
+from trpg.agents import AgentLLM, LLMConfig, MockLLM
+from trpg.agents.providers.base import ChatResult
 from trpg.models import CharacterRuntime, GameState, Party, Scene, WorldRef
 from trpg.rules.loader import Rules
-from trpg.testing import make_card
+from support.builders import make_card
 from trpg.world import load_world
 
 ROOT = Path(__file__).resolve().parents[1]

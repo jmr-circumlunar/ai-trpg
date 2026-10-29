@@ -5,7 +5,7 @@ import pytest
 from trpg.engine.state_merge import DeltaValidationError, apply_delta
 from trpg.models import CharacterRuntime, DeltaChange, GameState, Party, Scene, StateDelta, WorldRef
 from trpg.models.enums import DeltaOp
-from trpg.testing import make_card
+from support.builders import make_card
 
 
 def _state() -> GameState:

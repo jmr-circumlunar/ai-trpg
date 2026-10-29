@@ -9,6 +9,41 @@ defaults:
   # S1 定为 medium：这个项目要看的就是「每个角色每回合怎么想」，不能用 low 换速度
   reasoning_effort: medium
 
+# 分档：同一局里不同的活，用不同代价的配置。
+# 只调「思考深度 / max_tokens」，不换模型——换模型要重新评估质量，暂时不值得。
+# 命中规则：契约里只有一处——`AgentBase._chat_json` 与 `_pc_spec`（玩家 Agent）。
+#           角色卡上显式指定的 provider/model 优先级最高，分档不覆盖它。
+tiers:
+  gm: {}                      # GM 写场景与后果：跟 defaults（质量优先）
+  npc:                        # NPC 单句反应：短、快
+    reasoning_effort: low
+    max_tokens: 600
+  pc:                         # 玩家 Agent（ReAct）：**思考深度是质量的主要来源**
+    # 以前压到 low 是为了省钱，但那一档出来的角色「很蠢」（用户实测反馈）。
+    # 现在默认 high；再想更狠就用对局页顶栏的「思考：最大」档（efforts.max）。
+    reasoning_effort: high
+    max_tokens: 1600          # 与 TASK_TOKENS[player] 一致：JSON 被截断会触发重发，反而更贵
+  summary:                    # 每 5 回合摘要：短、快
+    reasoning_effort: low
+    max_tokens: 800
+  ending: {}                  # 结局文本：跟 defaults（这是玩家记住的一段）
+
+# 玩家可切的「思考档位」（对局页顶栏）：同时改**思考深度**、**输出预算**与**推理步数**。
+# 步数 = ReAct 最多允许模型来回思考几轮（工具调用算一轮）。
+efforts:
+  standard:                   # 稳：够用，也不太慢
+    reasoning_effort: medium
+    max_tokens: 1600
+    steps: 4
+  deep:                       # 深入：默认档（质量优先）
+    reasoning_effort: high
+    max_tokens: 2400
+    steps: 6
+  max:                        # 最大：最慢最贵，适合复盘关键一局
+    reasoning_effort: high
+    max_tokens: 3200
+    steps: 8
+
 providers:
   minimax:
     kind: minimax
@@ -18,6 +53,17 @@ providers:
     timeout: 90
     # 推理模型默认思考过长（单次 30s+）；low 档实测质量不变、耗时显著下降。
     # 注意：不要用 thinking.type=disabled——MiniMax 不支持，会返回空内容。
+    extra:
+      reasoning_effort: low
+
+  # LangChain 传输层（2026-10-23 起）：与 minimax 同一个模型，走 ChatOpenAI。
+  # 用法：`--provider minimax_lc`，或在角色卡上写 `provider: minimax_lc`。
+  # 为什么并存：替换期内两条链都要能跑，出问题可一键切回自研 adapter。
+  minimax_lc:
+    kind: langchain
+    base_url: https://api.minimaxi.com/v1
+    api_key_env: MINIMAX_API_KEY
+    timeout: 90
     extra:
       reasoning_effort: low
 
