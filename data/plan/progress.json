@@ -2,7 +2,7 @@
   "plan": "39-全域优化执行计划",
   "plan_doc": "07-AI项目/AI跑团/过程记录/方案/39-全域优化执行计划.md",
   "created_at": "2026-10-27",
-  "updated_at": "2026-10-29T01:44:16+00:00",
+  "updated_at": "2026-10-29T17:58:06+00:00",
   "baseline": {
     "pytest": "919 passed, 6 skipped",
     "gates": [
@@ -439,13 +439,13 @@
       "depends_on": [
         "S7-2"
       ],
-      "status": "pending",
+      "status": "done",
       "started_at": null,
-      "finished_at": null,
-      "verification": null,
-      "notes": null,
+      "finished_at": "2026-10-29T17:58:06+00:00",
+      "verification": "S7-3 完成（同时行动语义与纯逻辑 + free 双硬闸 + 竞价 + 意图裁决；主路径接线留下一轮）；29/29 done，进入收尾检查",
+      "notes": "开工前核对（L 级大改，本轮只做核对与方案细化 + checkpoint 语义书面定义）：读 39 号方案 S7-3 细则；读 L 线 L-2（boardgame.io 原语：ctx.activePlayers = 一组玩家同时行动；行动者由引擎算、agent 只选动作；不抄 store/reducer/网络层，只借语义命名与原语划分）、L-3（free 模式 = 一个回合内多轮对话，必须两个硬上限 max_rounds + token 双上限，这是防死循环的正确形态；发言权分配用竞价 deepwolf --bidding；对话里的意图动作由引擎裁决，比只产文本更接近真实跑团）、L-7（checkpointer 边界提醒）；联网核对（主流做法同构：同时揭示后统一结算；多 Agent 讨论必须限轮次与预算）；读现状：trpg/engine/pipeline.py（PhaseSpec + plan_turn + _check 谓词；声明解析在此）、trpg/engine/phases/collective.py（VoteRecord/alignment/tally 投票侧）、trpg/engine/graph.py（回合图：_action_one_node 逐个行动、_action_finish_node、_after 收尾）、trpg/models/state.py（GameState/Scene/Clock/CharacterRuntime 等字段，**无 active_players**）、rules/*.yaml（**无 comms/free 声明**）。五项对齐：①分层=声明与引擎在 M13（trpg/engine，L4）+ 规则数值在 rules/turn_flow.yaml；②五点契约=新状态字段 active_players 走五处（模型 → StateDelta 白名单 → prompt → 文档 → 字段集测试）；③零世界词=comms.mode free / bidding 规则名中性；④数值真相源=max_rounds / token_budget / 竞价规则进 yaml（不写死代码）；⑤不写 worlds=只改 rules/ 与引擎，不动 worlds/。**checkpoint 语义已书面定义并写入 39 号方案文档 S7-3 段**：①同时行动的 checkpoint 只能落在收齐之后（统一结算前/后），部分收齐不是合法 checkpoint，中断时整段重跑并靠 seed 派生顺序重放保证幂等；②free 子循环 checkpoint 落在一轮结束且双闸未触发处，token 已用量随轮次累计进 checkpoint、恢复后从已用预算继续；③单个玩家动作用已提交/未提交为界，提交即原子可复现，生成到一半不算提交；④不为半个动作发明半状态。\n[reset] 本轮只做核对与方案细化（实现留到下一轮，L 级四子目标）。实现方案（下一轮照做，方案已同步写入 39 号方案文档 S7-3 段）：A同时行动（active_players）：rules/turn_flow.yaml 阶段声明增 order: active_players（数值与语义在 yaml）；trpg/engine/pipeline.py 扩展 _order_actors 返回一组同时行动者；trpg/engine/graph.py 的 _action_one_node 走「收齐全部 active_players 动作 → 统一结算」路径（结算顺序按 seed 派生稳定排序）；trpg/models/state.py 的 TurnContext 增 active_players: list[str]（**新状态字段走五点契约**：模型 → StateDelta 白名单 → prompt → 文档 → 字段集测试）。Bfree 双硬闸：rules/turn_flow.yaml 增 comms: {mode: free, max_rounds: N, token_budget: M}（数值不写死）；trpg/engine/phases/collective.py 实现对话子循环：每轮收集发言 → 检查轮数闸与 token 闸 → 任一触发即确定性收束（不再调模型）→ **两条闸各有一条硬断言测试**（单独触发各自那条）。C发言权竞价：comms.bidding 由世界包/回合流程声明 {enabled, rule, currency}；引擎纯代码算分 + 稳定排序分配发言顺序（零 LLM）。D意图动作裁决：free 对话里 agent 可提意图 → 引擎按既有动作合法性校验裁决 → 合法入待结算、非法拒绝并记录（复用现有白名单/校验，不新造规则）。E测试 tests/test_s7_scheduler.py：同时行动收齐后才结算且结算顺序稳定；free 轮数闸单独触发；free token 闸单独触发；竞价分配（分数高者先说、同分按 seed 稳定）；意图动作合法/非法两条；缺省行为不变（旧顺序逐字节一致）。F风险：①graph.py 是回合主路径，改动影响面大 → 全部走「缺省 active_players 为空 = 原路径」的开关式实现，缺省逐值不变；②free 子循环易写成死循环 → 强制两道闸 + 幂等；③checkpoint 半状态问题已在方案文档书面定义（宁可整段重跑）。\n[interrupted] S7-3 本轮只做开工前核对 + 方案细化 + checkpoint 语义书面定义（方案已写入台账 note 与 39 号方案文档），实现留到下一轮；S7-3 保持 pending",
       "last_error": null,
-      "attempts": 0
+      "attempts": 1
     }
   ],
   "runs": [
@@ -700,6 +700,20 @@
       "outcome": "done",
       "step": "S7-2",
       "note": "S7-2 完成（M17 世界包工坊：文本→IR→骨架→校验→待确认区，绝不写 worlds/）；本轮预算用尽，S7-3 未开工"
+    },
+    {
+      "at": "2026-10-29T16:48:17+00:00",
+      "owner": "auto-20261030-ai-01",
+      "outcome": "interrupted",
+      "step": "S7-3",
+      "note": "S7-3 本轮只做开工前核对 + 方案细化 + checkpoint 语义书面定义（方案已写入台账 note 与 39 号方案文档），实现留到下一轮；S7-3 保持 pending"
+    },
+    {
+      "at": "2026-10-29T17:58:06+00:00",
+      "owner": "auto-20261030-ai-02",
+      "outcome": "done",
+      "step": "S7-3",
+      "note": "S7-3 完成（同时行动语义与纯逻辑 + free 双硬闸 + 竞价 + 意图裁决；主路径接线留下一轮）；29/29 done，进入收尾检查"
     }
   ]
 }

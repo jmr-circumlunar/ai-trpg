@@ -12,20 +12,21 @@
 
 命令
 ----
-    python tools/plan_runner.py status
-    python tools/plan_runner.py check
-    python tools/plan_runner.py lease acquire --owner <id> [--ttl 1800] [--step S0-1]
-    python tools/plan_runner.py lease heartbeat --owner <id>
-    python tools/plan_runner.py lease release --owner <id> --outcome done|failed|blocked|interrupted [--note "..."]
-    python tools/plan_runner.py step start   --id S0-1 --note "..."
-    python tools/plan_runner.py step finish  --id S0-1 --verification "..."
-    python tools/plan_runner.py step block   --id S0-1 --note "..."
-    python tools/plan_runner.py step reset   --id S0-1 --note "..."
-    python tools/plan_runner.py runs [--limit 20]
+    python tools/plan_runner.py [--plan <name>] status
+    python tools/plan_runner.py [--plan <name>] check
+    python tools/plan_runner.py [--plan <name>] lease acquire --owner <id> [--ttl 1800] [--step S0-1]
+    python tools/plan_runner.py [--plan <name>] lease heartbeat --owner <id>
+    python tools/plan_runner.py [--plan <name>] lease release --owner <id> --outcome done|failed|blocked|interrupted [--note "..."]
+    python tools/plan_runner.py [--plan <name>] step start   --id S0-1 --note "..."
+    python tools/plan_runner.py [--plan <name>] step finish  --id S0-1 --verification "..."
+    python tools/plan_runner.py [--plan <name>] step block   --id S0-1 --note "..."
+    python tools/plan_runner.py [--plan <name>] step reset   --id S0-1 --note "..."
+    python tools/plan_runner.py [--plan <name>] runs [--limit 20]
 
 约定
 ----
 - 台账：``data/plan/progress.json``（唯一状态来源）
+- ``--plan <name>``：换用独立台账 ``data/plan/<name>-progress.json``（与默认台账互不覆盖）
 - 租约：``data/plan/lease.json``（防重入 + 崩溃检测）
 - 备份：``data/plan/progress.json.bak``（台账损坏时回退）
 - 所有写盘都是**原子写**（临时文件 + os.replace），不会出现半截 JSON
@@ -36,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -60,6 +62,23 @@ LEASE = PLAN_DIR / "lease.json"
 
 DEFAULT_TTL = 1800          # 租约有效期（秒）：30 分钟无心跳即视为失联
 MAX_RUNS = 60               # 台账里保留的最近执行记录条数
+
+
+def plan_paths(plan: str) -> tuple[Path, Path, Path]:
+    """按计划名解析「台账 / 备份 / 租约」三个路径。
+
+    ``default`` → 39 号方案的 ``progress.json``（旧命令零影响）；
+    其他名字 → ``data/plan/<name>-progress.json`` 等，**独立台账互不覆盖**。
+    （狼人杀持续优化循环用 ``--plan werewolf``。）
+    """
+    if not plan or plan == "default":
+        return LEDGER, BACKUP, LEASE
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", plan).strip("-") or "plan"
+    return (
+        PLAN_DIR / f"{slug}-progress.json",
+        PLAN_DIR / f"{slug}-progress.json.bak",
+        PLAN_DIR / f"{slug}-lease.json",
+    )
 
 
 # --------------------------------------------------------------------------
@@ -354,6 +373,12 @@ def cmd_runs(args) -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="全域优化执行计划：台账与租约工具")
+    ap.add_argument(
+        "--plan",
+        default="default",
+        help="台账名（全局选项，写在子命令前）：default=39 号计划 progress.json；"
+             "其他名字=独立台账 data/plan/<name>-progress.json，如 werewolf",
+    )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("status", help="打印进度、下一步与租约状态")
@@ -393,6 +418,11 @@ def main() -> int:
     p.set_defaults(func=cmd_runs)
 
     args = ap.parse_args()
+
+    # 切换台账（--plan）：default 走 39 号计划的 progress.json，其余走独立台账
+    global LEDGER, BACKUP, LEASE
+    LEDGER, BACKUP, LEASE = plan_paths(args.plan)
+
     return args.func(args)
 
 

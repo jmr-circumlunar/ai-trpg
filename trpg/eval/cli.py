@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,13 +45,44 @@ def _run(args) -> dict:
         "camp_survival_rate": result.camp_survival_rate(),
         "agent_win_rate": result.agent_win_rate(),
         "exit_proxies": result.exit_proxies(),
+        # 随机基线的**同一组指标**：没有基线对照，数值没有意义
+        "baseline_exit_proxies": result.exit_proxies(result.baseline),
+        "skill_proxies": result.skill_proxies(),
+        "baseline_skill_proxies": result.skill_proxies(result.baseline),
         "calibration": result.calibration(),
     }
+
+
+def _write_out(args, payload: dict) -> None:
+    """把指标落盘（`--out`）：**可跨轮对比**的证据文件。
+
+    落盘内容 = 指标 + 随机基线对照 + 跑动参数（seed / games / turns …）。
+    """
+    path = str(getattr(args, "out", "") or "").strip()
+    if not path:
+        return
+    target = Path(path)
+    if target.parent and str(target.parent):
+        target.parent.mkdir(parents=True, exist_ok=True)
+    data = {k: v for k, v in payload.items() if k != "result"}
+    data["meta"] = {
+        "at": datetime.now().isoformat(timespec="seconds"),
+        "world": getattr(args, "world", ""),
+        "players": getattr(args, "players", 0),
+        "games": getattr(args, "games", 0),
+        "turns": getattr(args, "turns", 0),
+        "seed": getattr(args, "seed", ""),
+        "provider": getattr(args, "provider", ""),
+        "hostile_camps": _hostile_camps(getattr(args, "hostile_camps", "")),
+    }
+    target.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"[eval] 指标已落盘：{target}")
 
 
 def cmd_arena(args) -> int:
     data = _run(args)
     print(json.dumps({k: v for k, v in data.items() if k != "result"}, ensure_ascii=False, indent=2))
+    _write_out(args, data)
     return 0
 
 
@@ -65,6 +97,7 @@ def cmd_leaderboard(args) -> int:
         print(json.dumps({"leaderboard": rows, "baseline": data["baseline_camp_win_rate"]}, ensure_ascii=False, indent=2))
         return 0
     print(leaderboard_markdown(rows, data["baseline_camp_win_rate"], data["camp_win_rate"]))
+    _write_out(args, data)
     return 0
 
 
@@ -108,6 +141,7 @@ def cmd_calibrate(args) -> int:
         "reliability": reliability_table(samples),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    _write_out(args, data)
     return 0
 
 
@@ -140,6 +174,11 @@ def main(argv: list[str] | None = None) -> int:
             help="敌对阵营 id（空格分隔）；来自世界包词表，框架不解释含义",
         )
         p.add_argument("--no-baseline", action="store_true", help="不跑随机基线")
+        p.add_argument(
+            "--out",
+            default="",
+            help="把指标 JSON 落盘到该路径（含随机基线对照与跑动参数，可跨轮对比）",
+        )
         if name == "leaderboard":
             p.add_argument(
                 "--format",

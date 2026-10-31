@@ -266,6 +266,7 @@ def cmd_eval(args) -> int:
         ("--provider", args.provider),
         ("--turns", args.turns),
         ("--hostile-camps", args.hostile_camps),
+        ("--out", getattr(args, "out", "")),
     ):
         argv.extend([flag, str(value)])
     if args.no_baseline:
@@ -335,6 +336,11 @@ def main(argv: list[str] | None = None) -> int:
             help="敌对阵营 id（空格分隔，来自世界包词表）",
         )
         p.add_argument("--no-baseline", action="store_true", help="不跑随机基线")
+        p.add_argument(
+            "--out",
+            default="",
+            help="把指标 JSON 落盘到该路径（含随机基线对照与跑动参数，可跨轮对比）",
+        )
         if name == "leaderboard":
             p.add_argument(
                 "--format",

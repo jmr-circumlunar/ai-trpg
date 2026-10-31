@@ -1,0 +1,164 @@
+{
+  "plan": "40-狼人杀持续测试优化循环",
+  "plan_doc": "07-AI项目/AI跑团/过程记录/方案/40-狼人杀持续测试优化循环.md",
+  "created_at": "2026-10-30T00:00:00+00:00",
+  "updated_at": "2026-10-30T10:33:27+00:00",
+  "baseline": {
+    "pytest": "1273 passed, 7 skipped",
+    "gates": [
+      "check_contract",
+      "check_world",
+      "check_generic",
+      "check_docs --strict",
+      "npm run build"
+    ],
+    "note": "基线取自 39 号方案收官数字（2026-10-30）；任何一轮不得低于此基线。ironvale golden 必须逐字节不变。"
+  },
+  "steps": [
+    {
+      "id": "W1",
+      "title": "狼人杀专项回归套件 tests/test_werewolf_*.py",
+      "phase": 1,
+      "depends_on": [],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-30T05:11:57+00:00",
+      "verification": "W1 done：27 例专项回归套件 + 女巫不可自救修正；pytest 1299 passed + 7 skipped；五道门禁全绿；知识库 41 号方案 + 待办清单 + 回执已同步",
+      "notes": "覆盖 7 项关键机制：夜间行动对非狼人不可见 / 遗言 / 猎人开枪 / 女巫双药限制 / 平票 PK 重投 / 三类胜负判定 / 屠边。\n开工前核对五项对齐：①分层=只新增 tests/**，trpg/** 零改动，世界包改动落 M05 世界包层；②契约=未新增状态字段，StateDelta 白名单未动，五点契约不涉及；③零世界词=框架零改动，check_generic 通过；④数值=未改数值，改的是目标域声明 any_alive->other_alive（世界内容，非阈值）；⑤不写 worlds=红线指运行时不得写 worlds/*，本轮为人工改世界包且 check_world 通过，运行时仍只生成 data/promotions/*.yaml。联网核对 2 条：标准狼人杀规则（屠边/首夜遗言/女巫一晚一瓶且不可自救/猎人被毒不可开枪/平票 PK 再平票无人出局）+ WOLF 基准 arXiv 2512.09187（怀疑度+Brier 校准，W2/W4 取数口径）。知识库同步：41 号方案（先写方案再改代码，顺序未倒置）+ 02-待办清单 §1.7 规则缺口表改为已补齐 + §十四 W1 状态 + 01-工作台/自动化任务日志 回执。澄清上一轮疑似 bug：mock 局 10 回合只出 7 人、判定分布为空 = 第 2 回合已分出胜负、后续回合被 break_if:win_decided 跳过，且 judge=false 本就无 outcomes；已用 test_game_stops_producing_content_after_the_verdict 钉住。异常：租约 ttl 1800s 中途过期（age=3612s），两次 heartbeat 未拉回 HELD，同 owner 重新 acquire（stale_takeover）接管；该步从未置 in_progress，check 一致性通过，无僵尸状态。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W2",
+      "title": "4 条人工判据的机器代理指标（补 exit_proxies 缺的 2 条）",
+      "phase": 1,
+      "depends_on": [
+        "W1"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-30T06:34:39+00:00",
+      "verification": "W2 done：exit_proxies 扩到 6 条（阵营视角三条）+ --out 落盘 + 基线对照；pytest 1309 passed + 7 skipped；五道门禁全绿；知识库 42 号方案 + M16 文档 + 待办清单已同步",
+      "notes": "已有 3 条：first_day_survival / vote_hit_rate / vote_entropy；补「狼人误导成功」「好人推理有效」。\n开工前核对五项对齐：①分层=只动 M16（L7 评测层）trpg/eval/* 与 run.py 转发，不改 L0-L6 任何一层、不改世界包；②契约=未新增 GameState 字段，五点契约不涉及，改的是内存 dataclass（GameResult/ArenaResult/ExitProxies）不落库不进 StateDelta；③零世界词=代码只出现敌对阵营/己方阵营，阵营 id 由调用方给——首版指标名 ally_exile_success 命中框架黑名单被 check_generic 拦下（7 处），改名 ally_collective_success（框架自己的词 collective）后通过；④数值=无新增阈值与权重，口径是比例定义（分子分母写在代码与文档）；⑤不写 worlds=本轮零改动 worlds/。联网核对 2 条：WOLF 基准 arXiv 2512.09187（欺骗生产与欺骗检测必须分开度量，分析单元是逐句发言，本框架只能取投票级近似，粒度更粗已如实写明）+ Mini-Mafia 2509.23023（同类行为层指标）。知识库同步：42 号方案 + M16 模块总述（指标口径/本轮数字/读法纪律）+ 02-待办清单 §1.7 判据↔指标对照表 + §十四 W2 状态 + 自动化任务日志回执。关键结论：10 局时模型比随机基线会骗 +0.152，40 局收敛到 +0.017 约等于持平，说明没有基线对照就会把抽样噪声读成技能（deepwolf 教训的量化实例）；另记两条限制：arena 随机基线替换所有投票含组内共议故基线局与模型局是不同轨迹而非同轨迹反事实对照；投票级近似粗于逐句标注。异常：租约用 ttl 3600 全程未过期，每 10 分钟心跳；临时库 .tmp_w2_run.db 已清理，指标证据文件 data/plan/werewolf_exit_proxies.json 保留供跨轮对比。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W3",
+      "title": "信息泄露自动审计（每回合 × 每视角）",
+      "phase": 1,
+      "depends_on": [
+        "W1"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-30T08:09:02+00:00",
+      "verification": "W3 done：新增可见性泄露矩阵审计（trpg/eval/leak_audit.py + tools/audit_leak.py）+ 9 例测试；抓到并修掉 1 处真实泄露（共享快照 skill_charges 未过滤 → 隐藏身份被公开）；审计 240 出口违规 0，回退修复后报 10 条（非空转证据）；pytest 1318 passed + 7 skipped；五道门禁全绿",
+      "notes": "secrets(camp/profession) 与 visibility.thoughts 矩阵全覆盖；输出违规清单，空 = 通过。\n开工前核对五项对齐：①分层=审计器落 M16（L7 纯函数），出口裁剪只动 M14（L6）单一出口，不改 L0-L5 不改世界包；②契约=未新增 GameState 字段，五点契约不涉及，改的是出口字段清单与内存常量；③零世界词=审计器只处理字段与规则、矩阵由调用方给，工具的世界包 id 走命令行，check_generic 通过；④数值=无新增阈值与权重，规则是布尔判定；⑤不写 worlds=本轮零改动 worlds/。联网核对 2 条：arXiv 2607.10814 狼人杀隐藏信息审计（strict code-level information isolation + 可回放评测接口 → 隔离审计落出口层且可复跑）+ CMPL 多轮上下文隐私审计（泄露常发生在状态出口而非提示词，人工抽查发现不了 → 必须逐视角逐出口自动比对）。知识库同步：43 号方案 + M16 模块总述（审计口径/发现的泄露/非空转证据）+ M14 模块总述（出口口径修正）+ 02-待办清单 十四 W3 状态 + 自动化任务日志回执。审计器踩坑已修正：出局者回到上帝视角是合法可见（复盘语义），审计必须用接口层同一个 _is_observer 判定，否则把合法可见误判成泄露。顺带记一笔欠账：identity 端点 docstring 表格写着「其他人/上帝视角 职业与阵营都可见」，与代码相反，留 W6 校正。异常：租约 ttl 3600 全程未过期；临时库与探测脚本已清理，审计器用 tempfile 临时库不落仓库。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W4",
+      "title": "真实 provider 对照实验（狼阵营 vs 随机基线）",
+      "phase": 1,
+      "depends_on": [
+        "W2",
+        "W3"
+      ],
+      "status": "done",
+      "started_at": null,
+      "finished_at": "2026-10-30T10:33:27+00:00",
+      "verification": "W4 done：新增 skill_proxies 三条技能结果指标 + 逐局进度输出；真模型对照（minimax，4 局 x 2 回合含随机基线）：狼阵营胜率 0.25 vs 0.25 持平、好人指认 0.552 vs 0.313、校准 skill score +0.037；pytest 1320 passed + 7 skipped；五道门禁全绿",
+      "notes": "狼阵营胜率 / 预言家查验命中 / 女巫用药合理率 / 怀疑度 Brier 技巧分；必须给基线对照数字。\n开工前核对五项对齐：①分层=只动 M16（L7）trpg/eval/arena.py + cli.py，不改引擎不改世界包；②契约=未新增 GameState 字段，五点契约不涉及，新增的是评测侧采集与指标；③零世界词=效果原语 reveal_camp/heal/poison 是框架级，敌对阵营由调用方给，首版变量名 night_targets 命中框架黑名单已改名 consensus_targets（护栏第三次立功）；④数值=无新增阈值与权重，三条指标都是比例定义；⑤不写 worlds=本轮零改动 worlds/。凭据=MINIMAX_API_KEY 在 .env，provider 配置从 .env 取，只读不写不进回执不进仓库。联网核对：延续 WOLF 基准（arXiv 2512.09187）与 arXiv 2607.10814 两条口径。知识库同步：44 号方案 + M16 模块总述（指标定义 + 本轮数字 + 三条读数纪律）+ 02-待办清单 十四 W4 状态 + 自动化任务日志回执。读数纪律：4 局不是样本量（W2 已证 10 局是噪声），只写该批次下的差值不写结论；calibration.skill_score 量的是框架信念计算不是模型自报怀疑度；真模型约 105 秒每回合每局，要上量级需后台跑数小时。未深查的行为信号：女巫 4 局一次未用药（模型没选还是被驳回未分），留下一轮定向复核。踩坑：进度回调是同步调用 self._notify(...)，用 async def 收事件会一个都收不到（表现为技能样本全 0），已改同步函数。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W5",
+      "title": "界面可玩性截图验收（C75）",
+      "phase": 1,
+      "depends_on": [
+        "W1"
+      ],
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "verification": null,
+      "notes": "牌桌 / 心声气泡 / 投票面板 / 判定文案 / 真人席位面板，每项一张截图存 data/plan/ 并在回执引用。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W6",
+      "title": "知识库欠账回填（M08 词缀 / M17 工坊 / 契约点索引 / 待办清单）",
+      "phase": 1,
+      "depends_on": [],
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "verification": null,
+      "notes": "契约点索引与 02-待办清单 与代码一致；check_docs --strict 全绿；unresolvedLinks 为空。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W7",
+      "title": "世界包声明文件补齐（ui/seats.yaml / events.yaml / prompts/events.yaml）",
+      "phase": 1,
+      "depends_on": [],
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "verification": null,
+      "notes": "需人工放置（运行时禁止写 worlds/）；就位后 check_world 通过、机制生效。",
+      "attempts": 0,
+      "last_error": null
+    },
+    {
+      "id": "W8",
+      "title": "S7-3 主路径接线（同时行动 / free 双硬闸 / 竞价发言权）",
+      "phase": 1,
+      "depends_on": [
+        "W1"
+      ],
+      "status": "pending",
+      "started_at": null,
+      "finished_at": null,
+      "verification": null,
+      "notes": "仅在不影响 werewolf 缺省行为时做；缺省对局行为必须不变（golden + 回归套件守）。",
+      "attempts": 0,
+      "last_error": null
+    }
+  ],
+  "runs": [
+    {
+      "at": "2026-10-30T05:11:57+00:00",
+      "owner": "auto-20261030-werewolf-1",
+      "outcome": "done",
+      "step": "W1",
+      "note": "W1 done：27 例专项回归套件 + 女巫不可自救修正；pytest 1299 passed + 7 skipped；五道门禁全绿；知识库 41 号方案 + 待办清单 + 回执已同步"
+    },
+    {
+      "at": "2026-10-30T06:34:39+00:00",
+      "owner": "auto-20261030-werewolf-2",
+      "outcome": "done",
+      "step": "W2",
+      "note": "W2 done：exit_proxies 扩到 6 条（阵营视角三条）+ --out 落盘 + 基线对照；pytest 1309 passed + 7 skipped；五道门禁全绿；知识库 42 号方案 + M16 文档 + 待办清单已同步"
+    },
+    {
+      "at": "2026-10-30T08:09:02+00:00",
+      "owner": "auto-20261030-werewolf-3",
+      "outcome": "done",
+      "step": "W3",
+      "note": "W3 done：新增可见性泄露矩阵审计（trpg/eval/leak_audit.py + tools/audit_leak.py）+ 9 例测试；抓到并修掉 1 处真实泄露（共享快照 skill_charges 未过滤 → 隐藏身份被公开）；审计 240 出口违规 0，回退修复后报 10 条（非空转证据）；pytest 1318 passed + 7 skipped；五道门禁全绿"
+    },
+    {
+      "at": "2026-10-30T10:33:27+00:00",
+      "owner": "auto-20261030-werewolf-4",
+      "outcome": "done",
+      "step": "W4",
+      "note": "W4 done：新增 skill_proxies 三条技能结果指标 + 逐局进度输出；真模型对照（minimax，4 局 x 2 回合含随机基线）：狼阵营胜率 0.25 vs 0.25 持平、好人指认 0.552 vs 0.313、校准 skill score +0.037；pytest 1320 passed + 7 skipped；五道门禁全绿"
+    }
+  ]
+}

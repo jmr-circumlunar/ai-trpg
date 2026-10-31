@@ -20,13 +20,14 @@ skills:
     hint: 每晚一次，无消耗。优先验「最像在带节奏」的人；首夜验谁都可以，别浪费
 
   # 女巫：双药各一瓶，**同一晚只能用一瓶**（`exclusive_group`）。
+  # 目标用 `other_alive`（不含自己）——标准规则：**女巫不可自救**。
   - id: 解药
     label: 解药
     profession: 女巫
     trigger: turn
     window: night
     effect: heal
-    target: any_alive
+    target: other_alive
     resource: { key: 解药, charges: 1 }
     exclusive_group: 药
     hint: 一晚只能用一瓶。惯例首夜救被刀的人（你看得到谁被刀），救错也有信息

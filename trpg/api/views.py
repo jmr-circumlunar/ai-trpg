@@ -27,7 +27,10 @@ from typing import Any, Callable
 IDENTITY_FIELDS = ("profession", "path", "path_label")
 
 #: 私有字段：只给本人与观察者（角色级「已确认的信息」）。
-PRIVATE_FIELDS = ("notes",)
+#: `skill_charges` 也在内——技能资源余量同样是**本人已确认的状态**，
+#: 别人的余量等于公开「他手上还剩什么」，在隐藏身份类世界里会**直接暴露身份**
+#: （例：两种药各一瓶的角色，一眼就知道是谁）。
+PRIVATE_FIELDS = ("notes", "skill_charges")
 
 
 def filter_for_viewer(
@@ -55,6 +58,19 @@ def filter_for_viewer(
     if str(kind) == "log":
         return _filter_log(payload, thoughts_visible)
     return _filter_state(viewer, payload, secrets)
+
+
+def _empty_like(value: Any) -> Any:
+    """按原类型清空：list → `[]`，dict → `{}`，其余 → `""`。
+
+    类型要保持一致：把 dict 写成 `""` 会让下游拿到**类型不一致**的字段
+    （前端 `charges || {}` 之类只是恰好没炸）。
+    """
+    if isinstance(value, list):
+        return []
+    if isinstance(value, dict):
+        return {}
+    return ""
 
 
 def _filter_state(viewer: str, payload: Any, secrets: dict[str, Any] | None) -> Any:
@@ -85,7 +101,7 @@ def _filter_state(viewer: str, payload: Any, secrets: dict[str, Any] | None) -> 
                             item[field] = ""
                 for field in PRIVATE_FIELDS:
                     if field in item and item[field]:
-                        item[field] = [] if isinstance(item[field], list) else ""
+                        item[field] = _empty_like(item[field])
             out.append(item)
         data[key] = out
     return data

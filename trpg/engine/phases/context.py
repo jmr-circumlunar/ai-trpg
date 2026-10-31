@@ -63,6 +63,9 @@ class TurnContext:
     present: list[str] = field(default_factory=list)
     npc_moves: list[dict] = field(default_factory=list)
     ordered: list = field(default_factory=list)
+    # 同时行动的一组人（S7-3，boardgame.io 的 `activePlayers` 语义）：
+    # 这批人**一起行动**，收齐后才统一结算。空 = 不是同时行动（缺省行为不变）。
+    active_players: list[str] = field(default_factory=list)
     actions: list = field(default_factory=list)
     # 本回合**已提交的动作**登记（S4-1 统一入口）：`{actor_id: PlayerAction}`。
     # 用途是幂等——同一行动者重复提交时返回既有动作，不产生第二次行动。

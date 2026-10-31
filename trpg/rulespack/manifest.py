@@ -229,9 +229,13 @@ systems: dict[str, SystemSpec] = {
 
 # ── 二、阶段种类（7 个通用执行体） ────────────────────────────
 
-# `order` 只列**已实现**的取值：`rotating` / `simultaneous` / `free` 属阶段七，
+# `order` 只列**已实现**的取值：`rotating` / `simultaneous` / `free` 属后续阶段，
 # 以前写在枚举里但实现一律退化成 dex——世界包选了也看不出来（「写了不生效」）。
 # 未实现就不该出现在清单里；等真的做了再加回来。
+#
+# S7-3：`simultaneous`（一组玩家同时行动，收齐后统一结算）的**语义与纯逻辑**
+# 已在 `trpg/engine/scheduler.py` 就绪（boardgame.io 的 `activePlayers` 语义），
+# 但**主路径尚未接线** → 按上面的规矩，**不进枚举**（接线后再加回来）。
 _ORDER = ("dex", "fixed")
 _VISIBILITY = ("previous", "none", "all", "public", "private", "group")
 

@@ -1,0 +1,73 @@
+{
+  "camp_win_rate": {
+    "wolf": 0.25
+  },
+  "baseline_camp_win_rate": {
+    "wolf": 0.25
+  },
+  "camp_survival_rate": {
+    "village": 0.7,
+    "wolf": 0.8333333333333334
+  },
+  "agent_win_rate": {
+    "chr_p2": 0.0,
+    "chr_p3": 0.0,
+    "chr_p4": 0.0,
+    "chr_p5": 0.25,
+    "chr_p6": 0.0,
+    "chr_p7": 0.3333333333333333,
+    "chr_p8": 0.25
+  },
+  "exit_proxies": {
+    "first_day_survival": 0.75,
+    "vote_hit_rate": 0.6214577905754377,
+    "vote_entropy": 0.9054258070004821,
+    "deception_success": 0.4479166666666667,
+    "ally_effective_identification": 0.5520833333333333,
+    "ally_collective_success": 0.75
+  },
+  "baseline_exit_proxies": {
+    "first_day_survival": 0.75,
+    "vote_hit_rate": 0.6941302161890397,
+    "vote_entropy": 0.8911256789476187,
+    "deception_success": 0.6875,
+    "ally_effective_identification": 0.3125,
+    "ally_collective_success": 0.25
+  },
+  "skill_proxies": {
+    "reveal_hit_rate": 0.2857142857142857,
+    "reveal_samples": 7,
+    "heal_precision": 0.0,
+    "heal_samples": 0,
+    "poison_precision": 0.0,
+    "poison_samples": 0
+  },
+  "baseline_skill_proxies": {
+    "reveal_hit_rate": 0.42857142857142855,
+    "reveal_samples": 7,
+    "heal_precision": 0.0,
+    "heal_samples": 0,
+    "poison_precision": 0.0,
+    "poison_samples": 0
+  },
+  "calibration": {
+    "samples": 24,
+    "skill_score": 0.03658528777548564,
+    "brier": 0.234163298110125,
+    "reliability": 0.08247355984826983,
+    "resolution": 0.09176587301587301,
+    "uncertainty": 0.24305555555555552
+  },
+  "meta": {
+    "at": "2026-10-30T17:44:46",
+    "world": "werewolf",
+    "players": 8,
+    "games": 4,
+    "turns": 2,
+    "seed": "42",
+    "provider": "minimax",
+    "hostile_camps": [
+      "wolf"
+    ]
+  }
+}

@@ -8,7 +8,9 @@
 - **可靠性表**：按预测概率分箱，列出「预测概率 vs 实际发生率 + gap」。
 
 另外是阶段一出口判据的**机器近似**（B-3）：
-首日存活率、投票命中率、投票分布熵。
+首日存活率、投票命中率、投票分布熵，以及**阵营视角**的三条——
+敌对阵营伪装成功率、己方阵营指认命中率、己方阵营把敌对成员投票淘汰的对局占比
+（口径见知识库 `过程记录/方案/42-出口判据代理指标-W2`）。
 
 **零世界词**：这里只处理「概率 + 真值」的二元数据，阵营含义由调用方给（框架不解释）。
 
@@ -154,11 +156,28 @@ def reliability_table(
 
 @dataclass
 class ExitProxies:
-    """阶段一三条人工判据的机器近似（B-3）。"""
+    """阶段一出口判据的机器近似（B-3）：6 条。
+
+    | 指标 | 层级 | 含义 |
+    |---|---|---|
+    | `first_day_survival` | 对局 | 首日之后还活着的比例（不分阵营） |
+    | `vote_hit_rate` | 投票 | 票投给「后来出局的人」的比例（不分阵营） |
+    | `vote_entropy` | 投票 | 投票分布熵（越低越集中） |
+    | `deception_success` | 投票 | **敌对阵营的伪装成功率**：己方阵营的票里投给己方目标的比例 |
+    | `ally_effective_identification` | 投票 | **己方阵营的指认命中率**：己方阵营的票里投给敌对目标的比例 |
+    | `ally_collective_success` | 对局 | 己方阵营**至少一次把敌对成员投票淘汰**的对局占比 |
+
+    后三条是**阵营视角**的（需要调用方给敌对阵营词表），前三条是不分阵营的。
+    `deception_success` 与 `ally_effective_identification` 互补（和为 1）：
+    同一批票从双方视角各看一次——**没有随机基线对照时这两个数没有意义**。
+    """
 
     first_day_survival: float = 0.0
     vote_hit_rate: float = 0.0
     vote_entropy: float = 0.0
+    deception_success: float = 0.0
+    ally_effective_identification: float = 0.0
+    ally_collective_success: float = 0.0
     extras: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
@@ -166,6 +185,9 @@ class ExitProxies:
             "first_day_survival": self.first_day_survival,
             "vote_hit_rate": self.vote_hit_rate,
             "vote_entropy": self.vote_entropy,
+            "deception_success": self.deception_success,
+            "ally_effective_identification": self.ally_effective_identification,
+            "ally_collective_success": self.ally_collective_success,
             **self.extras,
         }
 

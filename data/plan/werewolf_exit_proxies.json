@@ -1,0 +1,58 @@
+{
+  "camp_win_rate": {
+    "wolf": 0.125
+  },
+  "baseline_camp_win_rate": {
+    "wolf": 0.025
+  },
+  "camp_survival_rate": {
+    "village": 0.695,
+    "wolf": 0.8583333333333333
+  },
+  "agent_win_rate": {
+    "chr_p1": 0.15384615384615385,
+    "chr_p2": 0.05555555555555555,
+    "chr_p3": 0.03571428571428571,
+    "chr_p4": 0.12903225806451613,
+    "chr_p5": 0.030303030303030304,
+    "chr_p6": 0.0,
+    "chr_p7": 0.0625,
+    "chr_p8": 0.038461538461538464
+  },
+  "exit_proxies": {
+    "first_day_survival": 0.75625,
+    "vote_hit_rate": 0.8733236077893753,
+    "vote_entropy": 0.9202373375473488,
+    "deception_success": 0.5058238289488289,
+    "ally_effective_identification": 0.49417617105117106,
+    "ally_collective_success": 0.375
+  },
+  "baseline_exit_proxies": {
+    "first_day_survival": 0.74375,
+    "vote_hit_rate": 0.8685862200001482,
+    "vote_entropy": 0.9221187064627422,
+    "deception_success": 0.48897373459873456,
+    "ally_effective_identification": 0.5110262654012654,
+    "ally_collective_success": 0.425
+  },
+  "calibration": {
+    "samples": 242,
+    "skill_score": -0.5424610121987161,
+    "brier": 0.3770817278814463,
+    "reliability": 0.2016645143137791,
+    "resolution": 0.06828204103977077,
+    "uncertainty": 0.24446759101154292
+  },
+  "meta": {
+    "at": "2026-10-30T14:27:22",
+    "world": "werewolf",
+    "players": 8,
+    "games": 40,
+    "turns": 6,
+    "seed": "42",
+    "provider": "mock",
+    "hostile_camps": [
+      "wolf"
+    ]
+  }
+}

@@ -111,3 +111,16 @@ skill_action_type:
   器械: professional
   学识: professional
   生存: risky
+
+# free 模式（S7-3）：**同一个回合内的多轮对话**（辩论）。
+# 必须有两个硬上限 —— 轮数 + token 预算。任一触发就确定性收束（不再调模型），
+# 这是防死循环与重复调模型的正确形态。
+# 数值在 yaml，代码不写死；mode 不为 free 时这些上限一律不生效。
+comms:
+  mode: free
+  max_rounds: 3
+  token_budget: 4000
+  # 发言权竞价：规则由声明给出，引擎纯代码算分（零 LLM）。
+  bidding:
+    enabled: false
+    rule: highest

@@ -19,12 +19,19 @@ from __future__ import annotations
 
 import asyncio
 import random
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from ..models.rng import derive
-from .calibration import Pair, brier_skill_score, murphy_decomposition, vote_distribution_entropy
+from .calibration import (
+    ExitProxies,
+    Pair,
+    brier_skill_score,
+    murphy_decomposition,
+    vote_distribution_entropy,
+)
 
 
 @dataclass
@@ -36,8 +43,17 @@ class GameResult:
     winner_camp: str = ""
     survivors: list[str] = field(default_factory=list)
     survivor_camps: dict[str, str] = field(default_factory=dict)
+    # 全部角色的阵营（**含已出局者**）：阵营视角的指标要按「投票者/目标」的阵营归类
+    all_camps: dict[str, str] = field(default_factory=dict)
     votes: list[tuple[int, str, str]] = field(default_factory=list)  # (turn, voter, target)
-    died: list[tuple[int, str]] = field(default_factory=list)  # (turn, cid)
+    died: list[tuple[int, str]] = field(default_factory=list)
+    # 带死因的出局记录：(turn, cid, cause)；`cause` 用来区分「被投票放逐」与其它死法
+    deaths: list[tuple[int, str, str]] = field(default_factory=list)
+    # 技能事件：(turn, actor, effect, target)；`effect` 是框架级效果原语
+    skills: list[tuple[int, str, str, str]] = field(default_factory=list)
+    # 夜里共议的刀口：(turn, target)——「当夜谁被定了」是公开事实，
+    # 用来判断「解药救的到底是不是真刀口」
+    consensus: list[tuple[int, str]] = field(default_factory=list)  # (turn, cid)
     beliefs: list[Pair] = field(default_factory=list)
     first_day_survivors: int = 0
     alive_at_start: int = 0
@@ -49,6 +65,8 @@ class ArenaResult:
 
     games: list[GameResult] = field(default_factory=list)
     baseline: list[GameResult] = field(default_factory=list)
+    # 敌对阵营词表（**由调用方给**，框架只比阵营 id，不解释含义）
+    hostile_camps: tuple[str, ...] = ()
 
     # ── 指标 ──────────────────────────────────────────────
     def camp_win_rate(self, results: list[GameResult] | None = None) -> dict[str, float]:
@@ -105,14 +123,72 @@ class ArenaResult:
             **decomposition,
         }
 
-    def exit_proxies(self, results: list[GameResult] | None = None) -> dict:
-        """阶段一三条人工判据的机器近似（B-3）。"""
+    def skill_proxies(
+        self, results: list[GameResult] | None = None, hostile_camps: tuple[str, ...] = ()
+    ) -> dict:
+        """三条**技能结果**指标：查验命中 / 解药合理 / 毒药合理。
+
+        | 指标 | 定义 |
+        |---|---|
+        | `reveal_hit_rate` | 查验事件里，目标属于敌对阵营的比例（抽到的信息多有价值） |
+        | `heal_precision` | 解药事件里，被救者**就是当回合共议定下的目标**的比例 |
+        | `poison_precision` | 毒药事件里，被毒者属于敌对阵营的比例 |
+
+        事件按**全局汇总**后再算比例（不按局平均）——一局里没发动过技能不该
+        稀释整体读数；同时给出各自的**样本数**，没有样本时比例没有意义。
+        """
         games = results if results is not None else self.games
+        hostile = set(hostile_camps or self.hostile_camps or ())
+        reveal_total = reveal_hit = 0
+        heal_total = heal_ok = 0
+        poison_total = poison_ok = 0
+        for game in games or []:
+            camps = dict(getattr(game, "all_camps", {}) or {})
+            consensus_targets = {cid for _turn, cid in (game.consensus or [])}
+            for _turn, _actor, effect, target in game.skills or []:
+                if effect == "reveal_camp":
+                    reveal_total += 1
+                    if camps.get(target, "") in hostile:
+                        reveal_hit += 1
+                elif effect == "heal":
+                    heal_total += 1
+                    if target in consensus_targets:
+                        heal_ok += 1
+                elif effect == "poison":
+                    poison_total += 1
+                    if camps.get(target, "") in hostile:
+                        poison_ok += 1
+        return {
+            "reveal_hit_rate": reveal_hit / reveal_total if reveal_total else 0.0,
+            "reveal_samples": reveal_total,
+            "heal_precision": heal_ok / heal_total if heal_total else 0.0,
+            "heal_samples": heal_total,
+            "poison_precision": poison_ok / poison_total if poison_total else 0.0,
+            "poison_samples": poison_total,
+        }
+
+    def exit_proxies(
+        self, results: list[GameResult] | None = None, hostile_camps: tuple[str, ...] = ()
+    ) -> dict:
+        """阶段一出口判据的机器近似（B-3）：**6 条**。
+
+        前三条不分阵营（首日存活 / 投票命中 / 投票分布熵）；
+        后三条是**阵营视角**的（敌对阵营伪装成功率 / 己方阵营指认命中率 /
+        己方阵营成功放逐敌对成员的对局占比）。
+
+        `hostile_camps` = 敌对阵营词表（阵营视角的三条要用它）。
+        不给 → 那三条为 0：**框架不猜谁是敌人**（词表由调用方给）。
+        """
+        games = results if results is not None else self.games
+        hostile = tuple(hostile_camps or self.hostile_camps or ())
         if not games:
-            return {"first_day_survival": 0.0, "vote_hit_rate": 0.0, "vote_entropy": 0.0}
+            return ExitProxies().as_dict()
         survival = []
         hit = []
         entropy = []
+        deception = []
+        identification = []
+        removed = []
         for game in games:
             survival.append(
                 game.first_day_survivors / game.alive_at_start if game.alive_at_start else 0.0
@@ -123,12 +199,19 @@ class ArenaResult:
             ]
             hit.append(sum(hits) / len(game.votes) if game.votes else 0.0)
             entropy.append(vote_distribution_entropy([t for _, _, t in game.votes]))
+            dec, ident, solved = _camp_vote_proxies(game, hostile)
+            deception.append(dec)
+            identification.append(ident)
+            removed.append(solved)
         n = len(games)
-        return {
-            "first_day_survival": sum(survival) / n,
-            "vote_hit_rate": sum(hit) / n,
-            "vote_entropy": sum(entropy) / n,
-        }
+        return ExitProxies(
+            first_day_survival=sum(survival) / n,
+            vote_hit_rate=sum(hit) / n,
+            vote_entropy=sum(entropy) / n,
+            deception_success=sum(deception) / n,
+            ally_effective_identification=sum(identification) / n,
+            ally_collective_success=sum(removed) / n,
+        ).as_dict()
 
 
 class _RandomVoteLLM:
@@ -147,6 +230,53 @@ class _RandomVoteLLM:
             return None
         rng = derive(self._seed, turn, f"random-vote-{actor_id}")
         return rng.choice(options)
+
+
+def _camp_vote_proxies(
+    game: GameResult, hostile_camps: tuple[str, ...]
+) -> tuple[float, float, float]:
+    """阵营视角的三条指标。
+
+    返回 `(deception_success, ally_effective_identification, ally_collective_success)`：
+
+    - `deception_success`：**敌对阵营的伪装成功率**——己方阵营投出的票里，
+      落在**己方目标**身上的比例（越高 = 己方越被带偏 = 敌对阵营越会骗人）；
+    - `ally_effective_identification`：**己方阵营的指认命中率**——同一批票里，
+      落在**敌对目标**身上的比例（越高 = 己方越能指对人）；
+    - `ally_collective_success`：本局是否出现过「己方阵营投票把敌对阵营成员
+      **集体淘汰**」（对局级指标，直接对应「至少一次有效推理」）。
+
+    没有敌对阵营词表 → 全 0（**框架不猜谁是敌人**）。
+    """
+    if not hostile_camps:
+        return 0.0, 0.0, 0.0
+    camps = dict(getattr(game, "all_camps", {}) or {})
+    hostile = set(hostile_camps)
+
+    # 己方阵营投出的**有效票**（弃权没有目标，不带信息，不计入分母）
+    ally_votes = [
+        (voter, target)
+        for _turn, voter, target in (game.votes or [])
+        if target
+        and voter
+        and camps.get(voter, "")
+        and camps.get(voter, "") not in hostile
+    ]
+    if not ally_votes:
+        return 0.0, 0.0, 0.0
+
+    on_hostile = [
+        target for _voter, target in ally_votes if camps.get(target, "") in hostile
+    ]
+    identification = len(on_hostile) / len(ally_votes)
+    deception = 1.0 - identification
+
+    # 对局级：敌对阵营成员被**集体决策淘汰**，且有己方阵营投过票给他
+    removed_by_vote = {
+        cid for _turn, cid, cause in (game.deaths or []) if cause == "collective_result"
+    }
+    solved = 1.0 if (set(on_hostile) & removed_by_vote) else 0.0
+    return deception, identification, solved
 
 
 def run_arena(
@@ -177,9 +307,17 @@ def run_arena(
     rules = Rules(base)
     pack = load_world(world, base)
     result = ArenaResult()
+    result.hostile_camps = tuple(hostile_camps)
 
     for index in range(max(1, int(games))):
         game_seed = f"{seed}-{index}"
+        # 逐局进度走 **stderr**：真模型批次很慢，要看得见走到第几局；
+        # stdout 只留 JSON（可被下游直接读）。
+        print(
+            f"[arena] 第 {index + 1}/{max(1, int(games))} 局（seed={game_seed}）…",
+            file=sys.stderr,
+            flush=True,
+        )
         game = _run_one(
             base,
             rules,
@@ -210,6 +348,37 @@ def run_arena(
                 )
             )
     return result
+
+
+async def _drive(loop, turns: int, out: "GameResult") -> list:
+    """跑回合并**顺手采技能事件**（`skill` 进度事件）。
+
+    为什么自己驱动而不是 `loop.run()`：技能事件只从**进度回调**出来，
+    而 `run()` 不给回调。逐回合驱动既能拿到事件，又能拿到当回合号。
+    """
+    records = []
+    for _ in range(turns):
+        pending: list[tuple[str, Any]] = []
+
+        # 进度回调是**同步**调用（`self._notify(...)`）→ 必须是普通函数，
+        # 用 async 的话返回的是没被 await 的协程，事件一个都收不到。
+        def _collect(name: str, data: Any = None) -> None:
+            pending.append((name, data))
+
+        rec = await loop.step(progress=_collect)
+        records.append(rec)
+        for name, data in pending:
+            if name != "skill" or not isinstance(data, dict):
+                continue
+            out.skills.append(
+                (
+                    int(rec.turn),
+                    str(data.get("id") or ""),
+                    str(data.get("effect") or ""),
+                    str(data.get("target") or ""),
+                )
+            )
+    return records
 
 
 def _run_one(
@@ -245,24 +414,31 @@ def _run_one(
         conn=None,
         pack=pack,
     )
-    records = asyncio.run(loop.run(turns))
-
     out = GameResult(seed=seed)
+    records = asyncio.run(_drive(loop, turns, out))
+
     out.alive_at_start = len(state.characters)
     camps = {cid: str(getattr(rt, "camp", "") or "") for cid, rt in state.characters.items()}
-    out.all_camps = camps  # type: ignore[attr-defined]
+    out.all_camps = camps
     for rec in records:
         for vote in rec.votes or []:
             out.votes.append((int(rec.turn), str(vote.get("voter") or ""), str(vote.get("target") or "")))
         for cid in rec.deaths or []:
             name = cid
+            cause = ""
             if isinstance(cid, dict):
                 name = cid.get("id") or cid.get("actor_id") or cid.get("cid") or ""
+                cause = str(cid.get("cause") or "")
             out.died.append((int(rec.turn), str(name)))
+            out.deaths.append((int(rec.turn), str(name), cause))
         if rec.turn == 1:
             out.first_day_survivors = len(
                 [cid for cid, rt in state.characters.items() if str(getattr(rt, "position", "")).endswith("scene")]
             )
+        consensus = (rec.vote_result or {}).get("consensus") or {}
+        consensus_target = str(consensus.get("winner") or "")
+        if consensus_target:
+            out.consensus.append((int(rec.turn), consensus_target))
     out.winner = str(getattr(state, "winner", "") or "")
     out.survivors = [
         cid for cid, rt in state.characters.items() if str(getattr(rt, "position", "")).endswith("scene")
